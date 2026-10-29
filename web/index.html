@@ -278,5 +278,375 @@
               Explore the Dashboard &rarr;
             </button>
           </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- 2. DASHBOARD VIEW (5 Operational Zones with Editorial Theme)              -->
+  <!-- ========================================================================= -->
+  <div id="dashboard-view" class="dashboard-view" style="display: none;">
+    <!-- Primary 5-Tab Navigation (Editorial Style) -->
+    <nav class="tab-nav-bar" id="dashboard-tab-bar">
+      <button class="tab-btn active" data-tab="pane-company" id="tab-company">1. COMPANY ZONE &mdash; Protected Enterprise</button>
+      <button class="tab-btn" data-tab="pane-red" id="tab-red">2. RED ZONE &mdash; Adversarial Testing</button>
+      <button class="tab-btn" data-tab="pane-target" id="tab-target">3. TARGET ZONE &mdash; Agent Runtime</button>
+      <button class="tab-btn" data-tab="pane-blue" id="tab-blue">4. BLUE ZONE &mdash; Monitoring &amp; Containment</button>
+      <button class="tab-btn" data-tab="pane-ledger" id="tab-ledger">5. AUDIT LEDGER &mdash; Cryptographic WORM</button>
+    </nav>
+
+    <!-- Threat Emergency Banner (Shown during active containment) -->
+    <div id="threat-hud-banner" class="modal-overlay hidden" style="position: static; padding: 1rem 2.5rem 0 2.5rem; background: transparent; backdrop-filter: none; z-index: 10;">
+      <div class="card-panel" style="background: var(--accent-red-subtle); border-color: var(--accent-red-border); margin-bottom: 0; width: 100%;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong id="hud-threat-title" class="text-red" style="font-size: 0.95rem;">SECURITY POLICY VIOLATION INTERCEPTED</strong>
+            <p id="hud-threat-desc" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">Tool execution blocked by policy sentry. Workload containment engaged.</p>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <span class="badge badge-red" id="hud-latency">-- ms slaughter</span>
+            <button id="btn-dismiss-hud" class="btn btn-secondary btn-sm">Dismiss</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Multi-View Container for Dashboard Panes -->
+    <main class="main-content">
+
+      <!-- ========================================================================= -->
+      <!-- TAB 1: COMPANY ZONE &mdash; SYNTHETIC ENTERPRISE ENVIRONMENT               -->
+      <!-- ========================================================================= -->
+      <section id="pane-company" class="tab-pane active">
+      <!-- Company Purpose Banner -->
+      <div class="card-panel" style="background: #ffffff; border-left: 4px solid var(--accent-emerald); margin-bottom: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <h2 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main); margin-bottom: 0.35rem;">
+              COMPANY ZONE: Synthetic Enterprise Environment
+            </h2>
+            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.6; max-width: 900px;">
+              Resource visibility and management for the synthetic enterprise being evaluated: <strong>Aegis Financial Solutions Ltd.</strong>
+              Contains realistic financial documents, structured CSV datasets, an operational SQLite database, and mock internal microservices.
+              This zone provides resource inspection only; it contains no separate chatbot and strictly enforces access boundaries.
+            </p>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="btn-refresh-company" class="btn btn-secondary btn-sm">Refresh Enterprise State</button>
+            <button id="btn-reset-company" class="btn btn-primary btn-sm">Reset Enterprise Baseline</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. Company Profile Card -->
+      <div class="card-panel" style="margin-bottom: 1.25rem;">
+        <div class="panel-header" style="margin-bottom: 0.75rem;">
+          <div>
+            <h3 class="panel-title" style="font-size: 0.95rem;">Enterprise Profile: Aegis Financial Solutions Ltd.</h3>
+            <p class="panel-sub">Synthetic FinTech &amp; Asset Management Enterprise (FCA Regulated Baseline)</p>
+          </div>
+          <span class="badge badge-permitted">Synthetic Corporation</span>
+        </div>
+
+        <div class="grid-4" style="margin-bottom: 1rem;">
+          <div class="metric-tile">
+            <div class="metric-tile-label">Industry</div>
+            <div class="metric-tile-val text-blue" style="font-size: 1rem;">FinTech / Asset Mgmt</div>
+            <div class="metric-tile-note">Automated Trading &amp; Analytics</div>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-tile-label">Jurisdiction</div>
+            <div class="metric-tile-val text-blue" style="font-size: 1rem;">London, United Kingdom</div>
+            <div class="metric-tile-note">Synthetic Campus / FCA Sandbox</div>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-tile-label">Operational Headcount</div>
+            <div class="metric-tile-val text-emerald" style="font-size: 1rem;">5 Key Personnel</div>
+            <div class="metric-tile-note">5 Departments Configured</div>
+          </div>
+          <div class="metric-tile">
+            <div class="metric-tile-label">Zero-Trust Posture</div>
+            <div class="metric-tile-val text-emerald" style="font-size: 1rem;">Strict Tri-Workload</div>
+            <div class="metric-tile-note">WORM Cryptographic Auditing</div>
+          </div>
+        </div>
+
+        <!-- Departments Table -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Department</th>
+                <th>Department Lead</th>
+                <th>Allocated Budget</th>
+                <th>Personnel Role</th>
+                <th>Corporate Email</th>
+              </tr>
+            </thead>
+            <tbody id="company-dept-tbody">
+              <tr>
+                <td><strong>Engineering</strong></td>
+                <td>Alice Morgan</td>
+                <td>$1,250,000 USD</td>
+                <td>VP of Engineering</td>
+                <td><code>alice.morgan@synthetic-corp.local</code></td>
+              </tr>
+              <tr>
+                <td><strong>Research</strong></td>
+                <td>Carol Danvers</td>
+                <td>$950,000 USD</td>
+                <td>Chief Research Scientist</td>
+                <td><code>carol.d@synthetic-corp.local</code></td>
+              </tr>
+              <tr>
+                <td><strong>Security</strong></td>
+                <td>Elena Rostova</td>
+                <td>$680,000 USD</td>
+                <td>Principal Security Architect</td>
+                <td><code>elena.r@synthetic-corp.local</code></td>
+              </tr>
+              <tr>
+                <td><strong>Logistics</strong></td>
+                <td>Bob Vance</td>
+                <td>$420,000 USD</td>
+                <td>Operations Manager</td>
+                <td><code>bob.vance@synthetic-corp.local</code></td>
+              </tr>
+              <tr>
+                <td><strong>Support</strong></td>
+                <td>David Miller</td>
+                <td>$310,000 USD</td>
+                <td>Support Operations Lead</td>
+                <td><code>david.m@synthetic-corp.local</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Document Repository & Classification -->
+      <div class="card-panel" style="margin-bottom: 1.25rem;">
+        <div class="panel-header" style="margin-bottom: 0.75rem;">
+          <div>
+            <h3 class="panel-title" style="font-size: 0.95rem;">Document Repository &amp; Classification Tiers</h3>
+            <p class="panel-sub">Real files persisted on disk with actual existence checks and byte counts. Click any document to view preview.</p>
+          </div>
+          <span class="badge badge-blue">Multi-Tier Classification</span>
+        </div>
+
+        <div class="grid-3" style="gap: 1rem; margin-bottom: 1rem;">
+          <!-- Column 1: Public Documents -->
+          <div class="card-panel" style="background: #fff; border: 1px solid #e2e8f0; margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong style="font-size: 0.85rem; color: var(--accent-blue);">Public Documents (Tier 4)</strong>
+              <span class="badge badge-permitted" id="doc-count-public">5 files</span>
+            </div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.5rem;">Accessible by all authorized internal inquiries.</p>
+            <div id="company-docs-public" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+              <div class="text-muted" style="font-size:0.75rem;">Loading public files...</div>
+            </div>
+          </div>
+
+          <!-- Column 2: Internal Documents -->
+          <div class="card-panel" style="background: #fff; border: 1px solid #e2e8f0; margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong style="font-size: 0.85rem; color: var(--accent-amber);">Internal Documents (Tier 3)</strong>
+              <span class="badge badge-permitted" id="doc-count-internal">7 files</span>
+            </div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.5rem;">Internal operational procedures &amp; runbooks.</p>
+            <div id="company-docs-internal" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+              <div class="text-muted" style="font-size:0.75rem;">Loading internal files...</div>
+            </div>
+          </div>
+
+          <!-- Column 3: Restricted Documents -->
+          <div class="card-panel" style="background: #fff; border: 1px solid #fecaca; margin-bottom: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong style="font-size: 0.85rem; color: var(--accent-red);">Restricted Documents (Tier 1/2)</strong>
+              <span class="badge badge-blocked" id="doc-count-restricted">5 files</span>
+            </div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-bottom: 0.5rem;">Strictly confidential executive salaries &amp; financial records.</p>
+            <div id="company-docs-restricted" style="max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+              <div class="text-muted" style="font-size:0.75rem;">Loading restricted files...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Safe File Content Preview Box -->
+        <div class="card-panel" style="background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 0;">
+          <div class="panel-header" style="margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <strong id="company-inspector-name" style="font-size: 0.85rem; color: var(--text-main);">Click any document above to safely inspect its content</strong>
+              <span id="company-inspector-badge" class="badge badge-neutral hidden">--</span>
+            </div>
+            <span id="company-inspector-size" class="text-muted" style="font-size: 0.75rem;">-- bytes</span>
+          </div>
+          <pre id="company-inspector-content" style="max-height: 200px; overflow-y: auto; font-family: 'Fira Code', monospace; font-size: 0.75rem; background: #0f172a; color: #f8fafc; padding: 1rem; border-radius: 4px; white-space: pre-wrap; line-height: 1.5;">Click any document above to inspect its real text content and verifiable metadata.</pre>
+        </div>
+      </div>
+
+      <!-- 3. SQLite Database & Structured Datasets -->
+      <div class="grid-2" style="margin-bottom: 1.25rem;">
+        <!-- Database Inspector -->
+        <div class="card-panel" style="margin-bottom: 0;">
+          <div class="panel-header" style="margin-bottom: 0.5rem;">
+            <div>
+              <h3 class="panel-title" style="font-size: 0.95rem;">Operational SQLite Database</h3>
+              <p class="panel-sub">Live tables and actual row counts dynamically queried from <code>company.db</code></p>
+            </div>
+            <span class="badge badge-permitted">SQLite 3</span>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Table Name</th>
+                  <th>Classification</th>
+                  <th>Permission</th>
+                  <th>Record Count</th>
+                </tr>
+              </thead>
+              <tbody id="company-db-tables-tbody">
+                <tr>
+                  <td><code>customers</code></td>
+                  <td>Tier 4 Public</td>
+                  <td><span class="badge badge-permitted">PERMITTED</span></td>
+                  <td><strong class="text-blue">5 rows</strong></td>
+                </tr>
+                <tr>
+                  <td><code>customer_complaints</code></td>
+                  <td>Tier 3 Internal</td>
+                  <td><span class="badge badge-permitted">PERMITTED</span></td>
+                  <td><strong class="text-blue">7 rows</strong></td>
+                </tr>
+                <tr>
+                  <td><code>employees</code></td>
+                  <td>Tier 3 Internal</td>
+                  <td><span class="badge badge-permitted">PERMITTED</span></td>
+                  <td><strong class="text-blue">5 rows</strong></td>
+                </tr>
+                <tr>
+                  <td><code>department_budgets</code></td>
+                  <td>Tier 3 Internal</td>
+                  <td><span class="badge badge-permitted">PERMITTED</span></td>
+                  <td><strong class="text-blue">5 rows</strong></td>
+                </tr>
+                <tr>
+                  <td><code>financial_records</code></td>
+                  <td>Tier 1 Confidential</td>
+                  <td><span class="badge badge-blocked">RESTRICTED</span></td>
+                  <td><strong class="text-red">5 rows (Vaulted)</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Structured CSV Datasets -->
+        <div class="card-panel" style="margin-bottom: 0;">
+          <div class="panel-header" style="margin-bottom: 0.5rem;">
+            <div>
+              <h3 class="panel-title" style="font-size: 0.95rem;">Structured Datasets</h3>
+              <p class="panel-sub">Verified disk CSV datasets in <code>data/demo_company/structured/</code></p>
+            </div>
+            <span class="badge badge-blue">CSV Datasets</span>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Dataset Filename</th>
+                  <th>Records</th>
+                  <th>Classification</th>
+                  <th>Attributes / Columns</th>
+                </tr>
+              </thead>
+              <tbody id="company-datasets-tbody">
+                <tr>
+                  <td><code>customers.csv</code></td>
+                  <td>5 rows</td>
+                  <td><span class="badge badge-permitted">Tier 4 Public</span></td>
+                  <td class="font-mono" style="font-size:0.7rem;">id, name, email, company, tier</td>
+                </tr>
+                <tr>
+                  <td><code>customer_complaints.csv</code></td>
+                  <td>7 rows</td>
+                  <td><span class="badge badge-permitted">Tier 3 Internal</span></td>
+                  <td class="font-mono" style="font-size:0.7rem;">id, customer_id, category, status</td>
+                </tr>
+                <tr>
+                  <td><code>employees.csv</code></td>
+                  <td>5 rows</td>
+                  <td><span class="badge badge-permitted">Tier 3 Internal</span></td>
+                  <td class="font-mono" style="font-size:0.7rem;">id, name, department, role, email</td>
+                </tr>
+                <tr>
+                  <td><code>department_budgets.csv</code></td>
+                  <td>5 rows</td>
+                  <td><span class="badge badge-permitted">Tier 3 Internal</span></td>
+                  <td class="font-mono" style="font-size:0.7rem;">department, budget, currency</td>
+                </tr>
+                <tr>
+                  <td><code>financial_records.csv</code></td>
+                  <td>5 rows</td>
+                  <td><span class="badge badge-blocked">Tier 1 Confidential</span></td>
+                  <td class="font-mono" style="font-size:0.7rem;">id, customer_id, credit_card, balance</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Internal Mock APIs & Real Request Logs (Part 4) -->
+      <div class="card-panel" style="margin-bottom: 1.25rem;">
+        <div class="panel-header" style="margin-bottom: 0.5rem;">
+          <div>
+            <h3 class="panel-title" style="font-size: 0.95rem;">Internal Synthetic APIs &amp; Live Request Logs</h3>
+            <p class="panel-sub">Isolated mock HTTP microservices on local backend. Test endpoints directly and inspect live request logs.</p>
+          </div>
+          <button id="btn-refresh-api-logs" class="btn btn-secondary btn-sm">Refresh API Logs</button>
+        </div>
+
+        <!-- Available Endpoints List with Test Buttons -->
+        <div class="table-responsive" style="margin-bottom: 1rem;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Service / Route</th>
+                <th>Endpoint Path</th>
+                <th>Classification</th>
+                <th>Access Policy</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Public Company Info</strong></td>
+                <td><code>GET /api/company/public/info</code></td>
+                <td>Tier 4 Public</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/company/public/info');">Probe Endpoint</button></td>
+              </tr>
+              <tr>
+                <td><strong>Public Service Health</strong></td>
+                <td><code>GET /api/company/public/health</code></td>
+                <td>Tier 4 Public</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/company/public/health');">Probe Endpoint</button></td>
+              </tr>
+              <tr>
+                <td><strong>Internal HR Roster</strong></td>
+                <td><code>GET /api/company/hr/employees</code></td>
+                <td>Tier 3 Internal</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/company/hr/employees');">Probe Endpoint</button></td>
+              </tr>
+              <tr>
+                <td><strong>Restricted HR Salaries</strong></td>
+                <td><code>GET /api/company/hr/salaries</code></td>
+                <td>Tier 2 Confidential</td>
+                <td><span class="badge badge-blocked">DENIED (403)</span></td>
 
 </div></body></html>
