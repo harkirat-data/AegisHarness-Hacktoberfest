@@ -298,5 +298,305 @@ class AttackController {
     const width = this.netCanvas.width = this.netCanvas.offsetWidth || 800;
     const height = this.netCanvas.height = 90;
     
+    const offset = { val: 0 };
+    const animate = () => {
+      ctx.fillStyle = "#FAF8F5";
+      ctx.fillRect(0, 0, width, height);
+      
+      ctx.strokeStyle = "rgba(226, 221, 213, 0.9)";
+      ctx.lineWidth = 1;
+      for (let y = 15; y < height; y += 20) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      for (let x = 0; x < width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      
+      const midY = height / 2;
+      let activeSpike = 0;
+      if (this.netSpikeAmplitudes && this.netSpikeAmplitudes.length > 0) {
+        activeSpike = this.netSpikeAmplitudes[this.netSpikeAmplitudes.length - 1];
+        this.netSpikeAmplitudes[this.netSpikeAmplitudes.length - 1] *= 0.90;
+        if (this.netSpikeAmplitudes[this.netSpikeAmplitudes.length - 1] < 1) {
+          this.netSpikeAmplitudes.pop();
+        }
+      }
+      
+      // Color waveform deep editorial maroon during attack spike, subtle slate when quiet
+      ctx.strokeStyle = activeSpike > 0 ? "#B23A22" : "#96938E";
+      ctx.lineWidth = activeSpike > 0 ? 2.4 : 1.4;
+      ctx.beginPath();
+      
+      for (let x = 0; x < width; x += 3) {
+        const baseSine = Math.sin((x + offset.val) * 0.04) * (activeSpike > 0 ? 4 : 1.2);
+        let spike = 0;
+        if (activeSpike > 0 && x > width * 0.45 && x < width * 0.85) {
+          const spikeCenter = width * 0.65;
+          const dist = Math.abs(x - spikeCenter);
+          spike = Math.max(0, (1 - dist / 70)) * activeSpike * Math.sin(x * 0.25);
+        }
+        const y = midY + baseSine + spike;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      
+      offset.val += 1.5;
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }
+
+  initMotionGraph() {
+    this.motionEvents = [];
+    const refreshBtn = document.getElementById("btn-refresh-motion-graph");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", () => this.renderMotionGraph());
+    }
+  }
+
+  addMotionEvent(eventData) {
+    this.motionEvents.push({
+      id: eventData.id || `EVT-${Date.now().toString(36).toUpperCase()}`,
+      time: eventData.time || new Date().toLocaleTimeString(),
+      category: eventData.category || "Corporate Resource Jailbreak",
+      llmReaction: eventData.llmReaction || "Refusal / Benign",
+      enforcement: eventData.enforcement || "PEP_DEFENSE_BLOCKED",
+      severity: eventData.severity || "MEDIUM",
+      status: eventData.status || "BLOCKED",
+      isBreach: !!eventData.isBreach
+    });
+    const cnt = document.getElementById("motion-node-count");
+    if (cnt) cnt.innerText = `${this.motionEvents.length} Incident Nodes`;
+    this.renderMotionGraph();
+  }
+
+  renderMotionGraph() {
+    const svg = document.getElementById("blue-motion-svg");
+    const emptyNotice = document.getElementById("motion-graph-empty");
+    if (!svg) return;
+    
+    if (!this.motionEvents || this.motionEvents.length === 0) {
+      if (emptyNotice) emptyNotice.style.display = "block";
+      svg.innerHTML = "";
+      return;
+    }
+    if (emptyNotice) emptyNotice.style.display = "none";
+    
+    const cardWidth = 175;
+    const cardGap = 40;
+    const svgWidth = Math.max(760, this.motionEvents.length * (cardWidth + cardGap) + 40);
+    svg.setAttribute("viewBox", `0 0 ${svgWidth} 150`);
+    svg.style.width = `${svgWidth}px`;
+    
+    let html = `
+      <defs>
+        <marker id="motion-arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1 L 8 5 L 0 9 z" fill="#96938E" />
+        </marker>
+        <filter id="card-shadow" x="-10%" y="-10%" width="125%" height="125%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1A1A1A" flood-opacity="0.08" />
+        </filter>
+      </defs>
+    `;
+    
+    this.motionEvents.forEach((evt, idx) => {
+      const x = 25 + idx * (cardWidth + cardGap);
+      const isBreach = evt.isBreach || (evt.enforcement && evt.enforcement.includes("BREACH")) || evt.severity === "CRITICAL";
+      const isDrill = !!evt.isSimulatedDrill;
+      const color = isDrill ? "#B45309" : (isBreach ? "#B23A22" : "#1E653A");
+      const headerBg = isDrill ? "#FDF6E2" : (isBreach ? "#FBEBE8" : "#EBF5EE");
+      const catLabel = (evt.category || "Adversarial Attack").replace(/_/g, " ").substring(0, 19);
+      const enfLabel = isDrill ? "⚡ DRILL SLAUGHTER" : (isBreach ? "🚨 BREACH SLAUGHTER" : "🛡️ PEP BLOCKED");
+      const llmSummary = (evt.llmReaction || "Refused exploit").substring(0, 22);
+
+      // Connecting arrow between consecutive incident cards
+      if (idx > 0) {
+        const prevX = 25 + (idx - 1) * (cardWidth + cardGap) + cardWidth;
+        html += `<line x1="${prevX + 4}" y1="72" x2="${x - 6}" y2="72" stroke="#96938E" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#motion-arrow)" />`;
+      }
+      
+      html += `
+        <g class="motion-card-node" data-idx="${idx}" style="cursor: pointer;" filter="url(#card-shadow)">
+          <title>Click to inspect forensic trace #${idx + 1}: ${evt.category} (${evt.time})</title>
+          <!-- Card Body Background (Editorial Paper) -->
+          <rect x="${x}" y="15" width="${cardWidth}" height="115" rx="6" fill="#FAF8F5" stroke="${color}" stroke-width="1.5" />
+          
+          <!-- Card Header Bar -->
+          <path d="M ${x} 21 A 6 6 0 0 1 ${x + 6} 15 L ${x + cardWidth - 6} 15 A 6 6 0 0 1 ${x + cardWidth} 21 L ${x + cardWidth} 42 L ${x} 42 Z" fill="${headerBg}" />
+          <line x1="${x}" y1="42" x2="${x + cardWidth}" y2="42" stroke="${color}" stroke-width="0.8" opacity="0.4" />
+          
+          <!-- Incident ID & Time -->
+          <text x="${x + 10}" y="33" fill="#1A1A1A" font-size="11" font-weight="700" font-family="'Inter', sans-serif">#${idx + 1} Incident</text>
+          <text x="${x + cardWidth - 10}" y="33" fill="#6E6B66" font-size="10" font-weight="600" font-family="'Fira Code', monospace" text-anchor="end">${evt.time}</text>
+          
+          <!-- Attack Category Label (Editorial Ink) -->
+          <text x="${x + 10}" y="62" fill="#1A1A1A" font-size="11" font-weight="700" font-family="'Inter', sans-serif">${catLabel}</text>
+          
+          <!-- LLM Reaction Snippet -->
+          <text x="${x + 10}" y="78" fill="#6E6B66" font-size="9.5" font-family="'Fira Code', monospace">${llmSummary}</text>
+          
+          <!-- Verdict Enforcement Pill -->
+          <rect x="${x + 8}" y="92" width="${cardWidth - 16}" height="22" rx="4" fill="${color}15" stroke="${color}" stroke-width="1" />
+          <text x="${x + (cardWidth / 2)}" y="107" fill="${color}" font-size="9.5" font-weight="700" font-family="'Inter', sans-serif" text-anchor="middle">${enfLabel}</text>
+        </g>
+      `;
+    });
+    
+    svg.innerHTML = html;
+
+    // Attach click listeners to cards for interactive forensic inspection
+    svg.querySelectorAll(".motion-card-node").forEach((card) => {
+      card.addEventListener("click", () => {
+        const idx = parseInt(card.getAttribute("data-idx"), 10);
+        this.inspectMotionEvent(idx);
+      });
+    });
+  }
+
+  inspectMotionEvent(idx) {
+    const evt = this.motionEvents[idx];
+    if (!evt) return;
+    const isBreach = evt.isBreach || (evt.enforcement && evt.enforcement.includes("BREACH"));
+    const statusText = isBreach ? "SLAUGHTERED (CONTAINED)" : "BLOCKED BY POLICY ENGINE";
+    alert(
+      `INCIDENT FORENSIC TRACE #${idx + 1}\n` +
+      `────────────────────────────────────────\n` +
+      `• Timestamp: ${evt.time}\n` +
+      `• Category: ${evt.category || "Unknown"}\n` +
+      `• LLM Reaction: ${evt.llmReaction || "Refusal recorded"}\n` +
+      `• PEP Enforcement: ${evt.enforcement || "PEP_DEFENSE_BLOCKED"}\n` +
+      `• Severity: ${evt.severity || "HIGH"}\n` +
+      `• Containment: ${statusText}\n` +
+      `• Proof: Recorded in Cryptographic WORM Audit Ledger`
+    );
+  }
+
+  logBlueSecurityEvent(evt) {
+    const stream = document.getElementById("blue-events-stream");
+    if (!stream) return;
+    
+    const emptyNotice = stream.querySelector(".text-muted");
+    if (emptyNotice && emptyNotice.innerText.includes("Listening")) {
+      stream.innerHTML = "";
+    }
+    
+    const now = new Date();
+    const timeStr = now.toTimeString().split(" ")[0];
+    const isDenial = evt.pepDecision === "PEP_DENIED" || evt.pepDecision === "DENIED" || evt.status === "DENIED";
+    const isBreach = evt.isBreach || evt.outcome === "EXFILTRATION_CONFIRMED" || (evt.severity && evt.severity.includes("CRITICAL"));
+    
+    const el = document.createElement("div");
+    el.style.cssText = "margin-bottom: 8px; padding: 6px 8px; background: rgba(15,23,42,0.85); border: 1px solid #1e293b; border-radius: 4px; font-size: 0.73rem; border-left: 3px solid " + (isBreach ? "#ef4444" : (isDenial ? "#f59e0b" : "#10b981")) + ";";
+    el.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+        <span style="color: #64748b; font-family: monospace;">[${timeStr}]</span>
+        <strong style="color: ${isBreach ? '#ef4444' : (isDenial ? '#38bdf8' : '#34d399')}; text-transform: uppercase;">
+          ${evt.category || 'ADVERSARIAL_ATTACK'}
+        </strong>
+        <span class="badge ${isBreach ? 'badge-blocked' : (isDenial ? 'badge-blocked' : 'badge-permitted')}" style="font-size: 0.65rem;">
+          ${isBreach ? 'QUARANTINE_SLAUGHTER' : (isDenial ? 'PEP_DENIED' : 'PEP_AUTHORIZED')}
+        </span>
+      </div>
+      <div style="color: #cbd5e1; margin-bottom: 2px;">
+        <strong>Target:</strong> <code style="color:#38bdf8;">${evt.target || 'company_assets'}</code> | <strong>Model:</strong> ${evt.model || this.activeModel || 'qwen2.5:3b'}
+      </div>
+      <div style="color: #94a3b8; font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+        <strong>Prompt:</strong> "${(evt.prompt || '').substring(0, 80)}..."
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 3px; font-size: 0.68rem; color: #64748b;">
+        <span>Tool: <code style="color:#f59e0b;">${evt.tool || 'none'}</code></span>
+        <span>Audit Block: <strong style="color:#38bdf8;">#${evt.auditBlock || '--'}</strong></span>
+      </div>
+    `;
+    stream.insertBefore(el, stream.firstChild);
+    while (stream.children.length > 30) {
+      stream.removeChild(stream.lastChild);
+    }
+  }
+
+  updateModelIndicators(modelName, confirmed = true) {
+    if (!modelName) return;
+    this.activeModel = modelName;
+    
+    // 1. Selector value
+    const selector = document.getElementById("global-model-selector");
+    if (selector && selector.value !== modelName) selector.value = modelName;
+
+    // 2. Chat mode model indicator
+    const chatInd = document.getElementById("chat-model-indicator");
+    if (chatInd) chatInd.innerText = modelName;
+
+    // 3. Technical evidence active model
+    const techInd = document.getElementById("tech-active-model");
+    if (techInd) techInd.innerText = modelName;
+
+    // 4. Target Zone overview model badge (Screenshot 5)
+    const targetViewModel = document.getElementById("target-view-model");
+    if (targetViewModel) targetViewModel.innerText = modelName;
+
+    // 5. Overview Zone active model card
+    const ovModel = document.getElementById("overview-active-model");
+    if (ovModel) ovModel.innerText = modelName;
+
+    // 6. Target Zone architecture visualizer model node (Screenshot 4)
+    const archSub = document.querySelector("#arch-node-inference .arch-node-sub");
+    if (archSub) archSub.innerText = `${modelName} (RO)`;
+
+    // 7. Generic active model displays across all screens
+    document.querySelectorAll(".active-model-display").forEach((el) => {
+      el.innerText = modelName;
+    });
+
+    // 8. Top status badge with verified status
+    const topBadge = document.getElementById("model-status-badge");
+    if (topBadge) {
+      topBadge.innerText = confirmed ? `${modelName} (Confirmed Active)` : `${modelName} (Verifying...)`;
+      topBadge.className = confirmed ? "badge badge-permitted" : "badge badge-neutral";
+    }
+  }
+
+  async selectTargetModel(modelName) {
+    // Show intermediate verifying state
+    this.updateModelIndicators(modelName, false);
+
+    try {
+      const res = await fetch("/api/models/select", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_name: modelName }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        console.log(`Backend verified active model: ${data.active_model}`);
+        this.updateModelIndicators(data.active_model, true);
+      } else {
+        console.warn(`Model switch rejected by backend: ${res.status}`);
+        const topBadge = document.getElementById("model-status-badge");
+        if (topBadge) topBadge.innerText = `${this.activeModel || "qwen2.5:3b"} (Switch Failed)`;
+      }
+    } catch (e) {
+      console.error("Model selection error:", e);
+      const topBadge = document.getElementById("model-status-badge");
+      if (topBadge) topBadge.innerText = `${this.activeModel || "qwen2.5:3b"} (Error)`;
+    }
+  }
+
+  initTabs() {
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-pane").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        const target = document.getElementById(btn.dataset.tab);
+        if (target) target.classList.add("active");
+        try {
+          if (btn.dataset.tab === "pane-overview") {
 
 }
