@@ -148,5 +148,105 @@ function buildExecEvent(type, zone, data) {
     'ATTACK_RECEIVED': 'stage-warn',
     'AGENT_INFERENCE_STARTING': 'stage-info',
     'AGENT_RESPONSE_RECEIVED': 'stage-info',
+    'TOOL_REQUEST_EVALUATED': 'stage-warn',
+    'QUARANTINE_ACTION': 'stage-quarantine',
+    'SYSCALL_TRAPPED': 'stage-denied',
+    'CONNECTION_ESTABLISHED': 'stage-info',
+  }[type] || 'stage-info';
+
+  return { type, zone, data, stageClass, ts: new Date().toLocaleTimeString() };
+}
+
+function appendExecEvent(ev) {
+  const log = document.getElementById('exec-log');
+  if (!log) return;
+  const empty = log.querySelector('.exec-empty');
+  if (empty) empty.remove();
+
+  const row = document.createElement('div');
+  row.className = `exec-event ${ev.stageClass}`;
+  const desc = execEventDesc(ev.type, ev.data);
+  row.innerHTML = `
+    <span class="exec-stage">${ev.type}</span>
+    <span class="exec-desc">${desc}</span>
+    <span class="exec-ts">${ev.ts}</span>
+  `;
+  log.appendChild(row);
+  log.scrollTop = log.scrollHeight;
+}
+
+function execEventDesc(type, data) {
+  const esc = s => String(s || '').replace(/</g, '&lt;');
+  switch (type) {
+    case 'ATTACK_RECEIVED': return `Attack dispatched: <strong>${esc(data.attack_name)}</strong> [${esc(data.severity)}]`;
+    case 'AGENT_INFERENCE_STARTING': return `Model <em>${esc(data.model)}</em> processing prompt...`;
+    case 'AGENT_RESPONSE_RECEIVED': return `Model responded. Refused: <strong>${data.refused}</strong>. Outcome: ${esc(data.outcome)}`;
+    case 'TOOL_REQUEST_EVALUATED': return `Tool <code>${esc(data.tool)}</code> &rarr; Policy: <strong>${data.policy_approved ? 'APPROVED' : 'DENIED'}</strong>`;
+    case 'QUARANTINE_ACTION': return `[QUARANTINE] <strong>QUARANTINE</strong>: PID ${data.workload_pid} terminated in ${data.slaughter_latency_ms?.toFixed(1) || 0}ms`;
+    case 'SYSCALL_TRAPPED': return `Syscall intercepted: <code>${esc(data.syscall_name)}</code> &mdash; ${esc(data.reason)}`;
+    case 'SANDBOX_STATUS': return `Sandbox state &rarr; ${esc(data.state)}`;
+    default: return esc(JSON.stringify(data).slice(0, 100));
+  }
+}
+
+function setWsStatus(connected) {
+  const dot = document.getElementById('ws-dot');
+  const lbl = document.getElementById('ws-label');
+  if (dot) dot.className = `dot ${connected ? 'dot-pulse' : 'dot-gray'}`;
+  if (lbl) lbl.textContent = connected ? 'Live' : 'Reconnecting...';
+}
+
+// ===== CHAT =====
+function handleChatKey(evt) {
+  if (evt.key === 'Enter' && !evt.shiftKey) {
+    evt.preventDefault();
+    sendChat();
+  }
+}
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  if (state.isQuarantined) {
+    appendChatMsg('system', 'Workload is quarantined and terminated. Click "+ New Sandbox" above to launch a clean environment.', 'denied');
+    return;
+  }
+
+  input.value = '';
+  const btn = document.getElementById('send-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+  }
+
+  // Append user message
+  appendChatMsg('user', msg);
+
+  // Show thinking
+  const thinkingId = appendThinking();
+
+  // Always sync active model from global selector if available
+  const globalSel = document.getElementById('global-model-selector') || document.getElementById('model-select');
+  const activeModel = globalSel ? globalSel.value : (state.activeModel || 'qwen2.5:3b');
+  state.activeModel = activeModel;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: msg,
+        session_id: state.sessionId,
+        target_model: activeModel,
+        assistant_mode: state.activeMode,
+      }),
+    });
+
+    removeThinking(thinkingId);
+
+    if (!res.ok) {
 
 });
