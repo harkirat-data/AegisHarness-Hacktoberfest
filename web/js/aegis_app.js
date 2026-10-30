@@ -518,5 +518,165 @@ async function loadSandboxFiles() {
     const appEl = document.getElementById('approved-files');
     if (appEl) appEl.textContent = 'Failed to load';
   }
+}
+
+function renderSandboxFiles(files, status) {
+  const approved = document.getElementById('approved-files');
+  const restricted = document.getElementById('restricted-files');
+  const dbTables = document.getElementById('db-tables');
+
+  if (!approved || !restricted || !dbTables) return;
+
+  approved.innerHTML = '';
+  restricted.innerHTML = '';
+  dbTables.innerHTML = '';
+
+  // Approved Documents
+  (files.documents || []).forEach(f => {
+    approved.appendChild(fileChip(f.name, 'ok', () => previewFile(f.path || `documents/${f.name}`)));
+  });
+
+  // Restricted Files
+  (files.restricted || []).forEach(f => {
+    restricted.appendChild(fileChip(f.name, 'blocked', () => previewFile(f.path || `restricted/${f.name}`)));
+  });
+  (files.structured || []).forEach(f => {
+    const isRestricted = f.name.includes('salary') || f.name.includes('payroll') || f.name.includes('secret');
+    const targetEl = isRestricted ? restricted : approved;
+    targetEl.appendChild(fileChip(f.name, isRestricted ? 'blocked' : 'ok', () => previewFile(f.path || `structured/${f.name}`)));
+  });
+
+  // Database Tables
+  (files.database_tables || []).forEach(t => {
+    const cls = t.permission === 'RESTRICTED' ? 'db-blocked' : 'db-ok';
+    dbTables.appendChild(fileChip(t.name, cls, () => previewDbTable(t.name, t.permission, t.description)));
+  });
+}
+
+function fileChip(name, cls, onclick) {
+  const span = document.createElement('span');
+  span.className = `file-chip ${cls}`;
+  const tag = (cls === 'blocked' || cls === 'db-blocked') ? ' [RESTRICTED]' : '';
+  span.textContent = name + tag;
+  if (onclick) {
+    span.style.cursor = 'pointer';
+    span.onclick = onclick;
+  }
+  return span;
+}
+
+async function previewFile(path) {
+  const preview = document.getElementById('file-preview');
+  if (!preview) return;
+  preview.innerHTML = `<div class="thinking" style="margin:24px auto;width:fit-content;">Loading preview...</div>`;
+  try {
+    const res = await fetch(`/api/demo/file-content?path=${encodeURIComponent(path)}`);
+    const data = await res.json();
+    const isRestricted = data.classification?.includes('RESTRICTED');
+    const badgeCls = isRestricted ? 'badge-red' : 'badge-success';
+
+    preview.innerHTML = `
+      <div class="preview-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <strong>${esc(data.filename)}</strong>
+          <span class="badge ${badgeCls}" style="margin-left:6px; font-size:10px;">${esc(data.classification)}</span>
+          <span style="font-size:11px; color:var(--text-muted); margin-left:6px;">(${data.size_bytes} bytes)</span>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="testAccessInChat('${esc(data.filename)}')">Test Access in Red Team Chat</button>
+      </div>
+      <div class="preview-content" style="margin-top:10px; max-height:280px; overflow-y:auto; background:var(--bg-input); padding:10px; border:1px solid var(--border); border-radius:4px; font-family:var(--mono); font-size:11px; white-space:pre-wrap;">${esc(data.content)}</div>
+    `;
+  } catch (e) {
+    preview.innerHTML = `<div class="preview-placeholder">Failed to load file. ${esc(e.message)}</div>`;
+  }
+}
+
+async function previewDbTable(table, permission, description) {
+  const preview = document.getElementById('file-preview');
+  if (!preview) return;
+  const isRestricted = permission === 'RESTRICTED';
+  const badgeCls = isRestricted ? 'badge-red' : 'badge-success';
+
+  preview.innerHTML = `
+    <div class="preview-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div>
+        <strong>${esc(table)}</strong>
+        <span class="badge ${badgeCls}" style="margin-left:6px; font-size:10px;">${isRestricted ? 'RESTRICTED (Tier 1/2)' : 'PERMITTED (Tier 3/4)'}</span>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="testAccessInChat('table ${esc(table)}')">Query Table via Red Team Chat</button>
+    </div>
+    <div class="preview-content" style="margin-top:10px; background:var(--bg-input); padding:12px; border:1px solid var(--border); border-radius:4px; font-size:12px; line-height:1.6;">
+      <p><strong>Description:</strong> ${esc(description || 'Synthetic enterprise dataset table.')}</p>
+      <p style="color:${isRestricted ? 'var(--red)' : 'var(--green)'}; margin-top:6px;">
+        ${isRestricted ? 'Zero-Trust PEP strictly intercepts and blocks SQL execution targeting this table.' : 'Authorized read-only queries are permitted under Zero-Trust bounds.'}
+      </p>
+    </div>
+  `;
+}
+
+function testAccessInChat(targetName) {
+  // Switch to red team pane if available
+  const tabRed = document.getElementById('tab-red');
+  if (tabRed) tabRed.click();
+
+  const input = document.getElementById('chat-input');
+  if (input) {
+    input.value = `I need information about ${targetName}`;
+    input.focus();
+  }
+}
+
+// ===== BLUE TEAM =====
+async function loadLedger() {
+  try {
+    const res = await fetch('/api/ledger?limit=200');
+    const records = await res.json();
+    state.allEvents = records;
+    renderEvents(records);
+    updateSevBars(records);
+    aggregateSocMetrics(records);
+
+    // Also update stats
+    state.stats.ledgerBlocks = records.length;
+    refreshStats();
+  } catch { /* non-critical */ }
+}
+
+function renderEvents(events) {
+  const log = document.getElementById('event-log');
+  if (!log) return;
+  log.innerHTML = '';
+
+  const filter = state.eventsFilter;
+  const filtered = filter === 'all' ? events : events.filter(e => e.severity === filter);
+
+  if (!filtered.length) {
+    log.innerHTML = '<div class="event-empty">No events match filter.</div>';
+    return;
+  }
+
+  // Show newest first
+  [...filtered].reverse().forEach(ev => {
+    const row = document.createElement('div');
+    const sevNum = sevToNum(ev.severity);
+    row.className = `audit-event sev-${sevNum}`;
+    row.title = JSON.stringify(ev.details || {}, null, 2);
+
+    const details = ev.details || {};
+    const detailStr = Object.entries(details)
+      .filter(([k]) => ['prompt', 'reason', 'error', 'tool', 'attack_name', 'query', 'response_preview', 'threat_name'].includes(k))
+      .map(([k, v]) => `${k}: ${String(v).slice(0, 80)}`)
+      .join(' | ');
+
+    row.innerHTML = `
+      <div class="evt-header">
+        <span class="evt-type">${esc(ev.event_type)}</span>
+        <span class="evt-sev sev-${sevNum}">${esc(ev.severity)}</span>
+        <span class="evt-zone">[${esc(ev.source_zone)}]</span>
+        <span class="evt-ts">${new Date(ev.timestamp).toLocaleTimeString()}</span>
+      </div>
+      <div class="evt-detail">${esc(detailStr)}</div>
+      <div class="evt-session">Session: ${esc(ev.session_id)}</div>
+    `;
 
 });
