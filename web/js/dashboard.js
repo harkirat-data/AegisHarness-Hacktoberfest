@@ -138,5 +138,65 @@ class AegisDashboard {
     this.appendTerminalLog("red", log, "text-red");
     this.updateSandboxStatus("EXECUTING", "status-executing");
     
+    if (data.session_id) {
+      const sbxDisplay = document.getElementById("sandbox-id-display");
+      if (sbxDisplay) sbxDisplay.innerText = `target-sbx-${data.session_id.substring(0, 8)}`;
+    }
+  }
+
+  onSyscallTrapped(data) {
+    this.playAlarmSound();
+    const log = `[SYSCALL_TRAP] Syscall #${data.syscall_id} (${data.syscall_name}) TRAPPED by Policy Sentry!\nReason: ${data.reason}`;
+    this.appendTerminalLog("target", log, "text-amber");
+
+    this.addSyscallTableRow(data.syscall_id, data.syscall_name, JSON.stringify(data.args), "TRAPPED");
+    this.updateSandboxStatus("THREAT DETECTED", "status-threat");
+  }
+
+  onThreatAlert(data) {
+    const log = `[THREAT_ANALYZER] SEV-1 Threat Classified: "${data.threat_name}" (${data.mitre_atlas_id})\nRecommended Action: ${data.action}`;
+    this.appendTerminalLog("blue", log, "text-red");
+
+    const banner = document.getElementById("threat-hud-banner");
+    const title = document.getElementById("hud-threat-title");
+    const desc = document.getElementById("hud-threat-desc");
+    if (banner && title && desc) {
+      title.innerText = `SEV-1 THREAT: ${data.threat_name} [${data.mitre_atlas_id}]`;
+      desc.innerText = `MITRE ATLAS Violation. Out-of-band audit pipe engaged. Quarantine slaughter in progress.`;
+      banner.classList.remove("hidden");
+    }
+  }
+
+  onQuarantineAction(data) {
+    this.slaughterCount++;
+    const countDisplay = document.getElementById("stat-slaughter-count");
+    if (countDisplay) countDisplay.innerText = this.slaughterCount;
+
+    const latVal = (data && typeof data.slaughter_latency_ms === "number") ? data.slaughter_latency_ms : (parseFloat(data?.slaughter_latency_ms) || 0.0);
+    const latStr = latVal.toFixed(2);
+
+    const latencyDisplay = document.getElementById("hud-latency");
+    if (latencyDisplay) latencyDisplay.innerText = `${latStr} ms slaughter`;
+
+    const statLatency = document.getElementById("stat-latency");
+    if (statLatency) statLatency.innerText = `${latStr} ms`;
+
+    const log = `[QUARANTINE_SLAUGHTER] Dedicated Process (PID ${data.workload_pid || 'CONTAINED'}) SLAUGHTERED in ${latStr}ms!\nProcess killed. Filesystem unlinked. Host shielded.\nAudit Hash recorded in WORM ledger.`;
+    this.appendTerminalLog("blue", log, "text-emerald");
+
+    this.updateSandboxStatus("QUARANTINED", "status-quarantined");
+    this.refreshLedgerStatus();
+  }
+
+  onSandboxStatus(data) {
+    if (data.sandbox_id) {
+      const sbxDisplay = document.getElementById("sandbox-id-display");
+      if (sbxDisplay) sbxDisplay.innerText = data.sandbox_id;
+    }
+    this.appendTerminalLog("target", `[TARGET_VFS] ${data.message}`);
+  }
+
+  updateSandboxStatus(text, pillClass) {
+    const pill = document.getElementById("sandbox-status-pill");
 
 };
