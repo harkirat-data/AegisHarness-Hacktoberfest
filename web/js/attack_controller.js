@@ -1849,4 +1849,304 @@ class AttackController {
       else runtimeCont.className = "badge badge-neutral";
     }
 
+    // 9. Audit Persistence
+    if (auditPersist) {
+      const ap = data.audit_persistence || (data.audit_hash ? "COMMITTED" : "NOT EXECUTED");
+      auditPersist.innerText = ap;
+      if (ap === "COMMITTED") auditPersist.className = "badge badge-permitted";
+      else if (ap === "NOT PERSISTED") auditPersist.className = "badge badge-blocked";
+      else auditPersist.className = "badge badge-neutral";
+    }
+
+    // 10. Audit Record Hash
+    if (auditHash) {
+      const h = data.audit_hash || data.audit_event_id;
+      if (h && h.length >= 8) {
+        auditHash.innerHTML = `<span style="color: var(--accent-cyan); cursor: pointer;" title="SHA-256 Ledger Block Hash: ${h} (Block #${data.audit_block_index != null ? data.audit_block_index : '--'})">${h.substring(0, 16)}...</span>`;
+      } else {
+        auditHash.innerHTML = `<span class="text-muted">--</span>`;
+      }
+    }
+
+    // 11. Isolation Claim
+    if (isolClaim) {
+      isolClaim.innerText = data.runtime_isolation_claim || "APPLICATION_LEVEL_PEP";
+    }
+
+    // 12. Execution Trace Stages
+    if (traceCont && data.trace_stages && data.trace_stages.length > 0) {
+      traceCont.innerHTML = "";
+      data.trace_stages.forEach((stg) => {
+        const box = document.createElement("div");
+        box.style.cssText = "background: rgba(0,0,0,0.03); border: 1px solid var(--card-border); border-radius: 4px; padding: 6px 10px; font-size: 0.74rem;";
+        const timeStr = stg.timestamp ? new Date(stg.timestamp).toLocaleTimeString() : "--";
+        const evidenceStr = JSON.stringify(stg.evidence, null, 2);
+
+        let stageColor = "var(--accent-blue)";
+        if (stg.stage.includes("DENIED") || stg.stage.includes("BLOCKED")) stageColor = "var(--accent-red)";
+        else if (stg.stage.includes("EXECUTED") || stg.stage.includes("PERMITTED")) stageColor = "var(--accent-emerald)";
+        else if (stg.stage.includes("PEP")) stageColor = data.pep_authorized ? "var(--accent-emerald)" : "var(--accent-red)";
+        else if (stg.stage.includes("AUDIT")) stageColor = "var(--accent-purple)";
+
+        box.innerHTML = `
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <strong style="color:${stageColor};">[${stg.stage}]</strong>
+            <span style="color:var(--text-dim); font-size:0.68rem;">${timeStr}</span>
+          </div>
+          <div style="color:var(--text-main); margin-top:2px;">${stg.description}</div>
+          <details style="margin-top:4px;">
+            <summary style="cursor:pointer; color:var(--text-muted); font-size:0.68rem;">View Evidence Payload</summary>
+            <pre style="margin:4px 0 0; padding:4px; background:#f1f5f9; border: 1px solid var(--card-border); border-radius:3px; font-size:0.68rem; color:#1e293b; overflow-x:auto;">${evidenceStr}</pre>
+          </details>
+        `;
+        traceCont.appendChild(box);
+      });
+    }
+
+    // 13. Correlated Telemetry Log Line
+    const term = document.getElementById("target-terminal-log");
+    if (term) {
+      const line = document.createElement("div");
+      line.innerText = `[${new Date().toLocaleTimeString()}] [EXEC: ${data.execution_id || 'unknown'}] Chat Turn | Model: ${data.model_decision} | PEP: ${data.pep_decision} | Access: ${data.resource_access_outcome} | Containment: ${data.runtime_containment} | Ledger Hash: ${data.audit_hash ? data.audit_hash.substring(0, 12) + "..." : "none"}`;
+      term.appendChild(line);
+      term.scrollTop = term.scrollHeight;
+    }
+  }
+
+  resetChat() {
+    this.chatSessionId = `chat-${Date.now()}`;
+    if (this.chatExecutions) this.chatExecutions.clear();
+
+    const messages = document.getElementById("chat-messages");
+    if (messages) {
+      messages.innerHTML = `
+        <div style="display: flex; margin-bottom: 12px; justify-content: flex-start;">
+          <div class="chat-bubble-assistant">
+            <div>
+              Hello! I am your <strong>AegisHarness Assistant</strong>. I am grounded in company resources (documents, databases, structured datasets) with zero-trust policy enforcement. How can I help you today?
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    const statusBadge = document.getElementById("chat-exec-status");
+    if (statusBadge) {
+      statusBadge.innerText = "IDLE";
+      statusBadge.className = "badge badge-neutral";
+    }
+    const execIdEl = document.getElementById("tech-exec-id");
+    if (execIdEl) execIdEl.innerText = "NOT EXECUTED";
+    const execTimeEl = document.getElementById("tech-exec-time");
+    if (execTimeEl) execTimeEl.innerText = "--";
+    const modelDec = document.getElementById("tech-model-decision");
+    if (modelDec) {
+      modelDec.innerText = "NOT EXECUTED";
+      modelDec.className = "badge badge-neutral";
+    }
+    const pepDec = document.getElementById("tech-pep-decision");
+    if (pepDec) {
+      pepDec.innerText = "NOT EXECUTED";
+      pepDec.className = "badge badge-neutral";
+    }
+    const toolName = document.getElementById("tech-tool-name");
+    if (toolName) toolName.innerHTML = "NOT EXECUTED";
+    const resAccess = document.getElementById("tech-resource-access");
+    if (resAccess) {
+      resAccess.innerText = "NOT EXECUTED";
+      resAccess.className = "badge badge-neutral";
+    }
+    const runtimeCont = document.getElementById("tech-runtime-containment");
+    if (runtimeCont) {
+      runtimeCont.innerText = "NOT EXECUTED";
+      runtimeCont.className = "badge badge-neutral";
+    }
+    const auditPersist = document.getElementById("tech-audit-persistence");
+    if (auditPersist) {
+      auditPersist.innerText = "NOT EXECUTED";
+      auditPersist.className = "badge badge-neutral";
+    }
+    const auditHash = document.getElementById("tech-audit-hash");
+    if (auditHash) auditHash.innerHTML = "--";
+    const isolClaim = document.getElementById("tech-isolation-claim");
+    if (isolClaim) isolClaim.innerText = "APPLICATION_LEVEL_PEP";
+
+    const traceCont = document.getElementById("chat-trace-stages");
+    if (traceCont) {
+      traceCont.innerHTML = `
+        <div class="text-muted" style="padding: 0.5rem; text-align: center; border: 1px dashed var(--card-border); border-radius: 4px;">
+          No execution recorded yet. Submit a message in the chat to observe verifiable stages.
+        </div>
+      `;
+    }
+  }
+
+  async executeDirectPEPTest() {
+    const toolSelect = document.getElementById("direct-pep-tool");
+    const argInput = document.getElementById("direct-pep-arg");
+    const modeSelect = document.getElementById("direct-pep-mode");
+    const objectiveInput = document.getElementById("red-test-objective");
+    const scopeSelect = document.getElementById("red-test-scope");
+    const testBtn = document.getElementById("btn-direct-pep-test");
+    const resultBox = document.getElementById("direct-pep-result");
+
+    const tool = toolSelect ? toolSelect.value : "read_document";
+    const arg = argInput ? argInput.value.trim() : "";
+    const mode = modeSelect ? modeSelect.value : "company";
+    const objective = objectiveInput && objectiveInput.value ? objectiveInput.value.trim() : "Direct PEP test verification";
+    const scope = scopeSelect ? scopeSelect.value : "documents";
+
+    if (!arg) {
+      alert("Please enter a target argument/asset for the direct PEP test.");
+      return;
+    }
+
+    if (testBtn) {
+      testBtn.disabled = true;
+      testBtn.innerText = "Evaluating PEP...";
+    }
+
+    try {
+      const res = await fetch("/api/pep/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tool_name: tool,
+          argument: arg,
+          assistant_mode: mode,
+          security_objective: objective,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        alert(`Direct PEP test failed: ${err.detail || res.statusText}`);
+        return;
+      }
+
+      const data = await res.json();
+
+      // Render outcome box in Red Zone
+      if (resultBox) {
+        resultBox.style.display = "block";
+        const isAuth = data.pep_authorized;
+        const decBadge = isAuth ? `<span class="badge badge-permitted">AUTHORIZED</span>` : `<span class="badge badge-blocked">DENIED</span>`;
+        resultBox.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+            <span>[EXEC: ${data.execution_id}] <strong>${data.tool_name}</strong></span>
+            <div>PEP Decision: ${decBadge}</div>
+          </div>
+          <div style="color: #94a3b8; margin-bottom: 0.35rem;">
+            Args: <span style="color: #f8fafc;">${JSON.stringify(data.tool_arguments)}</span> | Mode: <span style="color: #f8fafc;">${data.assistant_mode}</span>
+          </div>
+          <div style="color: ${isAuth ? '#4ade80' : '#f87171'}; margin-bottom: 0.35rem;">
+            Outcome: <strong>${data.resource_access_outcome}</strong> — ${data.policy_reason}
+          </div>
+          <div style="color: #64748b; font-size: 0.68rem; display: flex; justify-content: space-between;">
+            <span>Ledger Block Hash: ${data.audit_hash.substring(0, 20)}...</span>
+            <span>Block #${data.audit_block_index}</span>
+          </div>
+        `;
+      }
+
+      // Update correlated Technical Evidence Panel
+      const normalizedExec = {
+        execution_id: data.execution_id,
+        timestamp: data.timestamp,
+        model_name: "DIRECT_PEP_BYPASS (No LLM)",
+        target_model: "DIRECT_PEP_BYPASS",
+        outcome_type: data.pep_authorized ? "SUCCESS_PERMITTED" : "POLICY_DENIED",
+        model_decision: "DIRECT_PEP_BYPASS",
+        pep_decision: data.pep_decision,
+        pep_authorized: data.pep_authorized,
+        tool_invocation: `${data.tool_name}(${JSON.stringify(data.tool_arguments)})`,
+        resource_access_outcome: data.resource_access_outcome,
+        runtime_containment: data.pep_authorized ? "APPLICATION_PERMITTED" : "APPLICATION_PEP_BLOCKED",
+        audit_persistence: "COMMITTED",
+        audit_hash: data.audit_hash,
+        audit_block_index: data.audit_block_index,
+        runtime_isolation_claim: "APPLICATION_LEVEL_PEP",
+        trace_stages: data.trace_stages,
+      };
+      this.updateTechnicalPanel(normalizedExec);
+
+      // Record test metrics & execution history
+      this.recordTestRun(normalizedExec, objective, scope, data.execution_id);
+
+      // Synchronize Target Zone animated pipeline, motion graph & Blue stream
+      this.animateArchitectureFromExecution(normalizedExec);
+      this.logBlueSecurityEvent({
+        category: "Direct PEP Diagnostic",
+        prompt: `Direct API evaluation of tool: ${data.tool_name}`,
+        model: "PEP Sentry Direct",
+        tool: `${data.tool_name}(${JSON.stringify(data.tool_arguments)})`,
+        target: JSON.stringify(data.tool_arguments),
+        pepDecision: data.pep_decision,
+        status: data.pep_authorized ? "AUTHORIZED" : "DENIED",
+        auditBlock: data.audit_block_index,
+        isBreach: false
+      });
+      this.addMotionEvent({
+        id: data.execution_id,
+        time: new Date().toLocaleTimeString(),
+        category: "Direct PEP Diagnostic",
+        llmReaction: "DIRECT_DIAGNOSTIC (No LLM)",
+        enforcement: data.pep_decision === "DENIED" ? "PEP_DEFENSE_BLOCKED" : "PEP_AUTHORIZED",
+        severity: data.pep_authorized ? "LOW" : "HIGH",
+        status: data.pep_authorized ? "AUTHORIZED" : "BLOCKED",
+        isBreach: false
+      });
+
+      // Synchronize Blue Zone telemetry
+      await this.loadBlueEvents();
+      await this.loadLedgerTable();
+    } catch (e) {
+      console.error("Direct PEP execution error:", e);
+      alert("Direct PEP execution error: " + e.message);
+    } finally {
+      if (testBtn) {
+        testBtn.disabled = false;
+        testBtn.innerText = "Evaluate Direct PEP";
+      }
+    }
+  }
+
+  recordTestRun(data, objective = "Security verification", scope = "general", testRunId = null) {
+    if (!data) return;
+    const runId = testRunId || data.execution_id || `run-${Date.now()}`;
+    this.executionRecords[runId] = data;
+
+    this.testMetrics.attempted++;
+
+    const outcome = data.outcome_type || "NOT_VERIFIED";
+    const modelDecision = data.model_decision || "NOT EXECUTED";
+    const pepDecision = data.pep_decision || "NOT EXECUTED";
+    const resOutcome = data.resource_access_outcome || "NOT EXECUTED";
+    const runtimeCont = data.runtime_containment || "NOT EXECUTED";
+
+    let verdict = "BENIGN PERMITTED";
+    let verdictClass = "badge-permitted";
+
+    if (modelDecision === "MODEL_REFUSED" || modelDecision === "MODEL_REFUSAL" || outcome === "MODEL_REFUSED" || outcome === "MODEL_REFUSAL") {
+      this.testMetrics.modelRefusals++;
+      verdict = "MODEL REFUSED";
+      verdictClass = "badge-neutral";
+    } else if (pepDecision === "PEP_DENIED" || pepDecision === "DENIED" || resOutcome === "RESOURCE_ACCESS_DENIED" || resOutcome === "ACCESS_DENIED" || outcome === "PEP_DENIED" || outcome === "POLICY_DENIED") {
+      this.testMetrics.pepDenials++;
+      verdict = "DEFENDED BY PEP";
+      verdictClass = "badge-permitted";
+    } else if (outcome === "RUNTIME_BLOCKED" || runtimeCont === "APPLICATION_PEP_BLOCKED" || runtimeCont === "RUNTIME_BLOCKED") {
+      this.testMetrics.runtimeBlocked++;
+      verdict = "RUNTIME BLOCKED";
+      verdictClass = "badge-permitted";
+    } else if (modelDecision === "MODEL_DIRECT_RESPONSE" || outcome === "MODEL_DIRECT_RESPONSE" || modelDecision === "DIRECT_RESPONSE") {
+      verdict = "DIRECT RESPONSE (NO TOOL)";
+      verdictClass = "badge-neutral";
+    } else if (outcome === "RESOURCE_NOT_FOUND" || resOutcome === "RESOURCE_NOT_FOUND") {
+      verdict = "RESOURCE NOT FOUND";
+      verdictClass = "badge-neutral";
+    } else {
+      const isBreach = outcome === "CONFIRMED_BREACH" || outcome === "SUCCESS_PROHIBITED" || outcome === "BREACH_PERMITTED";
+      if (isBreach) {
+        this.testMetrics.confirmedBreaches++;
+
 }
