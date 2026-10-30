@@ -1548,5 +1548,305 @@ class AttackController {
       btnSendChat.addEventListener("click", () => this.sendChatMessage());
     }
 
+    const chatInput = document.getElementById("chat-input");
+    if (chatInput) {
+      chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          this.sendChatMessage();
+        }
+      });
+    }
+
+    document.querySelectorAll(".chat-suggestion-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        const prompt = chip.getAttribute("data-prompt");
+        if (prompt && chatInput) {
+          chatInput.value = prompt;
+          this.sendChatMessage();
+        }
+      });
+    });
+  }
+
+  setAssistantMode(mode) {
+    this.chatAssistantMode = mode;
+    const compBtn = document.getElementById("btn-mode-company");
+    const genBtn = document.getElementById("btn-mode-general");
+    const modeBadge = document.getElementById("tech-active-mode");
+    const chatBadge = document.getElementById("chat-mode-badge");
+    const modeSelect = document.getElementById("chat-assistant-mode-select");
+
+    if (modeSelect && modeSelect.value !== mode) {
+      modeSelect.value = mode;
+    }
+
+    if (compBtn && genBtn) {
+      if (mode === "company") {
+        compBtn.className = "btn btn-sm btn-primary";
+        genBtn.className = "btn btn-sm btn-secondary";
+      } else {
+        compBtn.className = "btn btn-sm btn-secondary";
+        genBtn.className = "btn btn-sm btn-primary";
+      }
+    }
+    if (modeBadge) {
+      modeBadge.innerText = mode === "company" ? "Company Assistant" : "General Assistant";
+    }
+    if (chatBadge) {
+      chatBadge.innerText = mode === "company" ? "Company Assistant" : "General Assistant";
+      chatBadge.className = mode === "company" ? "badge badge-permitted" : "badge badge-neutral";
+    }
+  }
+
+  async sendChatMessage() {
+    const input = document.getElementById("chat-input");
+    const sendBtn = document.getElementById("btn-send-chat") || document.getElementById("btn-chat-send");
+    const prompt = input ? input.value.trim() : "";
+    if (!prompt) return;
+
+    input.value = "";
+    this.appendChatMessage("user", prompt);
+
+    const actInd = document.getElementById("chat-activity-indicator");
+    const actText = document.getElementById("chat-activity-text");
+    if (actInd) actInd.classList.remove("hidden");
+    if (actText) actText.innerText = "Target model evaluating prompt & consulting policy...";
+    if (sendBtn) sendBtn.disabled = true;
+
+    const modelSelector = document.getElementById("global-model-selector");
+    const targetModel = modelSelector ? modelSelector.value : "qwen2.5:3b";
+    const executionId = `exec-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: prompt,
+          session_id: this.chatSessionId,
+          execution_id: executionId,
+          target_model: targetModel,
+          assistant_mode: this.chatAssistantMode,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (!this.chatExecutions) this.chatExecutions = new Map();
+        this.chatExecutions.set(data.execution_id, data);
+
+        this.appendChatMessage("assistant", data.final_response, data.sources, data.tool_status, data);
+        this.updateTechnicalPanel(data);
+
+        // Record metrics and append to execution history table
+        const objInput = document.getElementById("red-test-objective");
+        const scopeSel = document.getElementById("red-test-scope");
+        this.recordTestRun(
+          data,
+          objInput && objInput.value ? objInput.value : "Conversational Prompt Test",
+          scopeSel ? scopeSel.value : "general",
+          data.execution_id
+        );
+
+        this.animateArchitectureFromExecution(data);
+        await this.loadSOCDashboard();
+        await this.loadSOCAnalytics();
+        await this.loadSOCIncidents();
+
+        if (window.aegisDashboard) {
+          window.aegisDashboard.refreshLedgerStatus();
+        }
+        await this.loadBlueEvents();
+
+        this.logBlueSecurityEvent({
+          category: (objInput && objInput.value) || "Adversarial Prompt Test",
+          prompt: prompt,
+          model: targetModel,
+          tool: data.tool_status === "PROPOSED" && data.tool_invocation ? data.tool_invocation : (data.tool_status || "NONE"),
+          target: data.resource_access_outcome || "company_database_docs",
+          pepDecision: data.pep_decision,
+          status: data.pep_decision === "DENIED" ? "DENIED" : (data.confirmed_breach ? "BREACH" : "AUTHORIZED"),
+          auditBlock: data.audit_block_index || (data.audit_record ? data.audit_record.index : "--"),
+          isBreach: !!(data.confirmed_breach || (data.pep_decision && data.pep_decision.includes("BREACH")))
+        });
+
+        const isBreach = !!(data.pep_decision && (data.pep_decision.includes("BREACH") || data.pep_decision.includes("CONFIRMED_BREACH")));
+        this.addMotionEvent({
+          id: data.execution_id || `EXEC-${Date.now().toString(36)}`,
+          time: new Date().toLocaleTimeString(),
+          category: (objInput && objInput.value) || "Conversational Prompt Test",
+          llmReaction: data.tool_status === "PROPOSED" ? "Proposed Restricted Tool" : (data.tool_status === "EXECUTED" ? "Executed Tool Call" : "Model Direct Response"),
+          enforcement: data.pep_decision || (data.tool_status === "EXECUTED" ? "BREACH_SLAUGHTER" : "PEP_DEFENSE_BLOCKED"),
+          severity: isBreach ? "CRITICAL" : (data.tool_status === "PROPOSED" ? "HIGH" : "LOW"),
+          remediation: isBreach
+            ? "CRITICAL: Automated container slaughter engaged. Subprocess terminated. Invalidate token and inspect WORM ledger."
+            : "SecOps: Zero-trust Policy Enforcement Point (PEP) successfully dropped unauthorized resource access.",
+          isBreach: isBreach
+        });
+      } else {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        this.appendChatMessage("assistant", `⚠️ Request Error: ${err.detail || res.statusText}`, [], "FAILED");
+      }
+    } catch (err) {
+      this.appendChatMessage("assistant", `⚠️ Communication failure: ${err.message}`, [], "FAILED");
+    } finally {
+      if (actInd) actInd.classList.add("hidden");
+      if (sendBtn) sendBtn.disabled = false;
+      if (input) input.focus();
+    }
+  }
+
+  appendChatMessage(sender, text, sources = [], toolStatus = null, execData = null) {
+    const messages = document.getElementById("chat-messages");
+    if (!messages) return;
+
+    const row = document.createElement("div");
+    row.style.cssText = `display: flex; margin-bottom: 12px; justify-content: ${sender === "user" ? "flex-end" : "flex-start"};`;
+
+    const bubble = document.createElement("div");
+    bubble.className = sender === "user" ? "chat-bubble-user" : "chat-bubble-assistant";
+
+    let execHeader = "";
+    if (execData && execData.execution_id) {
+      bubble.style.cursor = "pointer";
+      bubble.title = `Click to inspect verifiable evidence for execution ${execData.execution_id}`;
+      bubble.onclick = () => {
+        const d = (this.chatExecutions && this.chatExecutions.get(execData.execution_id)) || execData;
+        this.updateTechnicalPanel(d);
+      };
+      execHeader = `
+        <div style="font-size: 0.62rem; color: var(--accent-cyan); font-family: monospace; margin-bottom: 4px; display: flex; justify-content: space-between; border-bottom: 1px dashed rgba(255,255,255,0.1); padding-bottom: 2px;">
+          <span>[EXEC: ${execData.execution_id}]</span>
+          <span>${execData.timestamp ? new Date(execData.timestamp).toLocaleTimeString() : ""}</span>
+        </div>
+      `;
+    }
+
+    let sourcesHtml = "";
+    if (sources && sources.length > 0) {
+      sourcesHtml = `
+        <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 0.75rem; color: #94a3b8;">
+          <strong style="color: var(--accent-cyan); font-family: 'Fira Code', monospace;">Verified Sources:</strong>
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px;">
+            ${sources.map((s) => `<span class="chat-source-tag">${s}</span>`).join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    let statusBadge = "";
+    if (toolStatus && toolStatus !== "NO_TOOL_PROPOSED") {
+      const isDenied = toolStatus.includes("DENIED");
+      const isSuccess = toolStatus === "EXECUTED_ALLOWED" || toolStatus === "SUCCESS";
+      statusBadge = `<div style="margin-bottom: 6px;"><span class="badge ${isDenied ? 'badge-blocked' : (isSuccess ? 'badge-permitted' : 'badge-neutral')}" style="font-size: 0.68rem;">TOOL: ${toolStatus}</span></div>`;
+    }
+
+    const formattedText = text ? text.replace(/\n\n/g, "<br/><br/>").replace(/\n/g, "<br/>") : "";
+    bubble.innerHTML = `${execHeader}${statusBadge}<div>${formattedText}</div>${sourcesHtml}`;
+
+    row.appendChild(bubble);
+    messages.appendChild(row);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  updateTechnicalPanel(data) {
+    if (!data) return;
+
+    const statusBadge = document.getElementById("chat-exec-status");
+    const execIdEl = document.getElementById("tech-exec-id");
+    const execTimeEl = document.getElementById("tech-exec-time");
+    const activeModel = document.getElementById("tech-active-model");
+    const modelDec = document.getElementById("tech-model-decision");
+    const pepDec = document.getElementById("tech-pep-decision");
+    const toolName = document.getElementById("tech-tool-name");
+    const resAccess = document.getElementById("tech-resource-access");
+    const runtimeCont = document.getElementById("tech-runtime-containment");
+    const auditPersist = document.getElementById("tech-audit-persistence");
+    const auditHash = document.getElementById("tech-audit-hash");
+    const isolClaim = document.getElementById("tech-isolation-claim");
+    const traceCont = document.getElementById("chat-trace-stages");
+
+    // 1. Overall execution status badge
+    if (statusBadge) {
+      const outcome = data.outcome_type || "NOT_VERIFIED";
+      statusBadge.innerText = outcome;
+      if (outcome === "RESOURCE_ACCESS_PERMITTED" || outcome === "SUCCESS_PERMITTED") {
+        statusBadge.className = "badge badge-permitted";
+      } else if (outcome === "PEP_DENIED" || outcome === "POLICY_DENIED" || outcome === "RESOURCE_ACCESS_DENIED" || outcome === "RUNTIME_BLOCKED" || outcome === "RUNTIME_QUARANTINED" || outcome === "SUCCESS_PROHIBITED" || outcome === "BREACH_PERMITTED") {
+        statusBadge.className = "badge badge-blocked";
+      } else if (outcome === "MODEL_REFUSED" || outcome === "MODEL_REFUSAL" || outcome === "MODEL_DIRECT_RESPONSE" || outcome === "RESOURCE_NOT_FOUND") {
+        statusBadge.className = "badge badge-neutral";
+      } else {
+        statusBadge.className = "badge badge-neutral";
+      }
+    }
+
+    // 2. Execution ID & Timestamp correlation
+    if (execIdEl) {
+      execIdEl.innerText = data.execution_id || "NOT VERIFIED";
+      execIdEl.title = `Correlated Execution ID: ${data.execution_id || "--"}`;
+    }
+    const techCatEl = document.getElementById("tech-category-display");
+    if (techCatEl) {
+      techCatEl.innerText = data.attack_category || data.category || (data.details && data.details.attack_category) || "--";
+    }
+    if (execTimeEl) {
+      execTimeEl.innerText = data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : "--";
+    }
+
+    // 3. Active Model
+    if (activeModel) {
+      activeModel.innerText = data.model_name || data.target_model || "--";
+    }
+
+    // 4. Model Decision
+    if (modelDec) {
+      const dec = data.model_decision || "NOT EXECUTED";
+      modelDec.innerText = dec;
+      if (dec === "TOOL_PROPOSED") modelDec.className = "badge badge-permitted";
+      else if (dec === "MODEL_REFUSED" || dec === "MODEL_REFUSAL") modelDec.className = "badge badge-neutral";
+      else if (dec === "MODEL_DIRECT_RESPONSE" || dec === "DIRECT_RESPONSE") modelDec.className = "badge badge-neutral";
+      else if (dec === "INFERENCE_ERROR") modelDec.className = "badge badge-blocked";
+      else modelDec.className = "badge badge-neutral";
+    }
+
+    // 5. PEP Decision
+    if (pepDec) {
+      const pep = data.pep_decision || "NOT EXECUTED";
+      pepDec.innerText = pep;
+      if (pep === "PEP_AUTHORIZED" || pep === "AUTHORIZED") pepDec.className = "badge badge-permitted";
+      else if (pep === "PEP_DENIED" || pep === "DENIED") pepDec.className = "badge badge-blocked";
+      else pepDec.className = "badge badge-neutral";
+    }
+
+    // 6. Tool Invocation
+    if (toolName) {
+      const toolInv = data.tool_invocation || "NOT EXECUTED";
+      if (toolInv !== "NOT EXECUTED") {
+        const isDenied = data.pep_decision === "PEP_DENIED" || data.pep_decision === "DENIED" || data.resource_access_outcome === "RESOURCE_ACCESS_DENIED" || data.resource_access_outcome === "ACCESS_DENIED";
+        toolName.innerHTML = `<span style="color: ${isDenied ? 'var(--accent-red)' : 'var(--accent-emerald)'};" title="${toolInv}">${toolInv}</span>`;
+      } else {
+        toolName.innerHTML = `<span class="text-muted">NOT EXECUTED</span>`;
+      }
+    }
+
+    // 7. Resource-Access Outcome
+    if (resAccess) {
+      const res = data.resource_access_outcome || "NOT EXECUTED";
+      resAccess.innerText = res;
+      if (res === "RESOURCE_ACCESS_PERMITTED" || res === "ACCESS_PERMITTED") resAccess.className = "badge badge-permitted";
+      else if (res === "RESOURCE_ACCESS_DENIED" || res === "ACCESS_DENIED") resAccess.className = "badge badge-blocked";
+      else if (res === "RESOURCE_NOT_FOUND") resAccess.className = "badge badge-neutral";
+      else resAccess.className = "badge badge-neutral";
+    }
+
+    // 8. Runtime Containment
+    if (runtimeCont) {
+      const rtc = data.runtime_containment || "NOT EXECUTED";
+      runtimeCont.innerText = rtc;
+      if (rtc === "APPLICATION_PEP_BLOCKED" || rtc === "RUNTIME_BLOCKED" || rtc === "CONTAINER_QUARANTINED" || rtc === "CONTAINER_SLAUGHTERED") runtimeCont.className = "badge badge-blocked";
+      else runtimeCont.className = "badge badge-neutral";
+    }
 
 }
