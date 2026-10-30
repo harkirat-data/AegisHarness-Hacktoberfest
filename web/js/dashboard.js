@@ -198,5 +198,92 @@ class AegisDashboard {
 
   updateSandboxStatus(text, pillClass) {
     const pill = document.getElementById("sandbox-status-pill");
+    if (pill) {
+      pill.innerText = text;
+      pill.className = `status-pill ${pillClass}`;
+    }
+  }
 
-};
+  addSyscallTableRow(num, name, args, action) {
+    const tbody = document.getElementById("syscall-table-body");
+    if (!tbody) return;
+
+    if (tbody.children.length === 1 && tbody.children[0].innerText.includes("Awaiting")) {
+      tbody.innerHTML = "";
+    }
+
+    const tr = document.createElement("tr");
+    const isBlocked = action === "TRAPPED" || action === "BLOCKED";
+    const badgeClass = isBlocked ? "badge-blocked" : "badge-permitted";
+
+    tr.innerHTML = `
+      <td>#${num}</td>
+      <td class="text-amber"><strong>${name}</strong></td>
+      <td class="text-muted" title="${args}">${args.substring(0, 32)}...</td>
+      <td><span class="${badgeClass}">${action}</span></td>
+    `;
+
+    tbody.insertBefore(tr, tbody.firstChild);
+    if (tbody.children.length > 20) {
+      tbody.removeChild(tbody.lastChild);
+    }
+  }
+
+  appendTerminalLog(zone, text, textClass = "") {
+    const terminal = document.getElementById(`${zone}-terminal-log`);
+    if (!terminal) return;
+
+    const line = document.createElement("div");
+    line.className = `log-line ${textClass}`;
+    line.innerText = `[${new Date().toLocaleTimeString()}] ${text}`;
+    terminal.appendChild(line);
+    terminal.scrollTop = terminal.scrollHeight;
+  }
+
+  async refreshLedgerStatus() {
+    try {
+      const res = await fetch("/api/ledger/verify");
+      if (res.ok) {
+        const data = await res.json();
+        const blockSpan = document.getElementById("block-count");
+        if (blockSpan) blockSpan.innerText = data.block_count;
+
+        const tipSpan = document.getElementById("ledger-tip-hash");
+        if (tipSpan && data.tip_hash) {
+          tipSpan.innerText = `${data.tip_hash.substring(0, 16)}...${data.tip_hash.substring(56)}`;
+        }
+
+        const verifyText = document.getElementById("ledger-verify-text");
+        if (verifyText) {
+          verifyText.innerText = data.is_valid ? "Mathematically Intact" : "INTEGRITY COMPROMISED";
+          verifyText.className = data.is_valid ? "text-emerald" : "text-red";
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch ledger tip", e);
+    }
+  }
+
+  bindEvents() {
+    const dismissBtn = document.getElementById("btn-dismiss-hud");
+    if (dismissBtn) {
+      dismissBtn.addEventListener("click", () => {
+        const banner = document.getElementById("threat-hud-banner");
+        if (banner) banner.classList.add("hidden");
+      });
+    }
+  }
+}
+
+function initAegisDashboard() {
+  if (!window.aegisDashboard) {
+    window.aegisDashboard = new AegisDashboard();
+    window.aegisDashboard.refreshLedgerStatus();
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAegisDashboard);
+} else {
+  initAegisDashboard();
+}
