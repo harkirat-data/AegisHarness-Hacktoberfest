@@ -678,5 +678,145 @@ function renderEvents(events) {
       <div class="evt-detail">${esc(detailStr)}</div>
       <div class="evt-session">Session: ${esc(ev.session_id)}</div>
     `;
+    log.appendChild(row);
+  });
+}
+
+function sevToNum(sev) {
+  if (sev?.includes('1_CRITICAL')) return 1;
+  if (sev?.includes('2_HIGH'))     return 2;
+  if (sev?.includes('3_MEDIUM'))   return 3;
+  return 4;
+}
+
+function filterEvents(filter, btn) {
+  state.eventsFilter = filter;
+  document.querySelectorAll('.sev-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEvents(state.allEvents);
+}
+
+function setElText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function updateBar(id, count, total, label) {
+  const bar = document.getElementById(`bar-${id}`);
+  if (bar) bar.style.width = `${Math.min(100, Math.round((count / (total || 1)) * 100))}%`;
+  const cnt = document.getElementById(`cnt-${id}`);
+  if (cnt) cnt.textContent = label !== undefined ? label : count;
+}
+
+function updateSevBars(events) {
+  const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  events.forEach(e => counts[sevToNum(e.severity)]++);
+
+  const total = events.length || 1;
+  for (let i = 1; i <= 4; i++) {
+    updateBar(`sev${i}`, counts[i], total, counts[i]);
+  }
+
+  // Also update SOC Defense Distribution bars
+  updateBar('soc-sev4', counts[4], total, `${counts[4]} incidents`);
+  updateBar('soc-sev2', counts[2], total, `${counts[2]} incidents`);
+  updateBar('soc-sev1', counts[1], total, `${counts[1]} incidents`);
+}
+
+function aggregateSocMetrics(records) {
+  let totalAttacks = 0;
+  let successfulJailbreaks = 0;
+  let modelRefusals = 0;
+  let toolProposals = 0;
+  let pepDenials = 0;
+  let authorizedOps = 0;
+  let resourceViolations = 0;
+  let runtimeBlocks = 0;
+  let confirmedBreaches = 0;
+  let quarantineEvents = 0;
+  let containments = 0;
+
+  let catConversational = 0;
+  let catJailbreaks = 0;
+  let catChat = 0;
+  let catMultiTurn = 0;
+
+  records.forEach(r => {
+    const d = r.details || {};
+    const evType = r.event_type || '';
+    const sev = r.severity || '';
+
+    if (evType === 'ATTACK_STARTED' || evType === 'INTERACTION_LOGGED' || evType === 'SANDBOX_PROVISIONED' || d.prompt || d.user_message) {
+      totalAttacks++;
+    }
+    if (d.pep_authorized === false || evType === 'POLICY_DENIED' || evType === 'PEP_DENIAL') {
+      pepDenials++;
+    }
+    if (d.pep_authorized === true || evType === 'AUTHORIZED_EXECUTION' || evType === 'PEP_AUTHORIZED') {
+      authorizedOps++;
+    }
+    if (d.refused_by_model || d.model_refused || evType === 'MODEL_REFUSAL') {
+      modelRefusals++;
+    }
+    if (d.tool || d.tool_name || evType === 'TOOL_PROPOSAL' || evType === 'TOOL_REQUEST_EVALUATED') {
+      toolProposals++;
+    }
+    if (sev === 'SEV-1_CRITICAL' || d.quarantined || evType === 'QUARANTINE_ACTION' || evType === 'MANUAL_QUARANTINE') {
+      quarantineEvents++;
+    }
+    if (evType === 'CONTAINMENT_ENGAGED' || d.quarantined || evType === 'QUARANTINE_ACTION') {
+      containments++;
+    }
+    if (sev === 'SEV-2_HIGH' || sev === 'SEV-1_CRITICAL' || d.outcome_type === 'POLICY_DENIED') {
+      resourceViolations++;
+      successfulJailbreaks++;
+    }
+    if (evType === 'RUNTIME_BLOCKED' || evType === 'EGRESS_BLOCKED' || evType === 'SYSCALL_INTERCEPT') {
+      runtimeBlocks++;
+    }
+
+    const cat = (d.category || d.scenario_id || d.attack_name || '').toLowerCase();
+    if (cat.includes('jailbreak') || cat.includes('tamper') || cat.includes('unauthorized') || cat.includes('resource') || cat.includes('finance')) {
+      catJailbreaks++;
+    } else if (cat.includes('multi') || cat.includes('turn')) {
+      catMultiTurn++;
+    } else if (r.source_zone === 'RED' || cat.includes('chat') || cat.includes('red')) {
+      catChat++;
+    } else {
+      catConversational++;
+    }
+  });
+
+  state.stats.total = Math.max(state.stats.total, totalAttacks);
+  state.stats.blocked = Math.max(state.stats.blocked, pepDenials);
+  state.stats.permitted = Math.max(state.stats.permitted, authorizedOps);
+  state.stats.threats = Math.max(state.stats.threats, successfulJailbreaks);
+
+  setElText('stat-campaigns', state.stats.campaigns || 0);
+  setElText('stat-total', state.stats.total);
+  setElText('stat-threats', state.stats.threats);
+  setElText('stat-refusals', modelRefusals);
+  setElText('stat-tool-proposals', toolProposals);
+  setElText('stat-blocked', state.stats.blocked);
+  setElText('stat-permitted', state.stats.permitted);
+  setElText('stat-resource-violations', resourceViolations);
+  setElText('stat-runtime-blocks', runtimeBlocks);
+  setElText('stat-breaches', confirmedBreaches);
+  setElText('stat-quarantines', quarantineEvents);
+  setElText('stat-containments', containments || pepDenials);
+
+  const catTotal = Math.max(1, catConversational + catJailbreaks + catChat + catMultiTurn);
+  updateBar('cat-conv', catConversational, catTotal, `${catConversational} attacks`);
+  updateBar('cat-jailbreak', catJailbreaks, catTotal, `${catJailbreaks} attacks`);
+  updateBar('cat-chat', catChat, catTotal, `${catChat} attacks`);
+  updateBar('cat-multiturn', catMultiTurn, catTotal, `${catMultiTurn} attacks`);
+}
+
+async function verifyChain() {
+  const card = document.getElementById('chain-card');
+  const statusEl = document.getElementById('chain-status');
+  const detailEl = document.getElementById('chain-detail');
+
+  if (statusEl) statusEl.textContent = 'Verifying...';
 
 });
