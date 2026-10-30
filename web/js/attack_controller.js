@@ -2448,5 +2448,305 @@ class AttackController {
     const targetModelSelect = document.getElementById("target-model-select");
     const repeatCountInput = document.getElementById("repeat-count");
 
+    const promptInput = document.getElementById("prompt-input");
+    const cmdInput = document.getElementById("command-input");
+    const objectiveInput = document.getElementById("test-objective");
+    const expectedOutcomeSelect = document.getElementById("expected-outcome");
+
+    const repeatCount = repeatCountInput ? parseInt(repeatCountInput.value, 10) || 1 : 1;
+    const targetModel = globalModelSel ? globalModelSel.value : (targetModelSelect ? targetModelSelect.value : "qwen2.5:3b");
+    const objective = objectiveInput ? objectiveInput.value : "";
+    const expectedOutcome = expectedOutcomeSelect ? expectedOutcomeSelect.value : "RUNTIME_BLOCKED";
+
+    if (fireBtn) {
+      fireBtn.disabled = true;
+      fireBtn.innerText = isRealAgent ? "AGENT INFERENCING..." : "DISPATCHING...";
+    }
+
+    for (let rep = 0; rep < repeatCount; rep++) {
+      const sessionId = `sess-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      this.lastSessionId = sessionId;
+
+      const payload = {
+        attack_id: this.selectedAttack ? this.selectedAttack.id : null,
+        custom_prompt: promptInput ? promptInput.value : null,
+        custom_command: cmdInput ? cmdInput.value : null,
+        session_id: sessionId,
+        use_real_agent: isRealAgent,
+        target_model: targetModel,
+        test_objective: objective,
+        expected_outcome: expectedOutcome,
+        repeat_count: 1,
+      };
+
+      try {
+        const res = await fetch("/api/attacks/launch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          this.handleAttackResult(data, payload);
+        } else {
+          const err = await res.json().catch(() => ({ detail: res.statusText }));
+          alert("Error launching attack: " + (err.detail || res.statusText));
+        }
+      } catch (e) {
+        console.error("Attack dispatch failed:", e);
+        alert("Execution failed: " + e.message);
+      }
+    }
+
+    if (fireBtn) {
+      fireBtn.disabled = false;
+      fireBtn.innerText = originalText;
+    }
+  }
+
+  handleAttackResult(data, originalPayload) {
+    // 1. Update Test Run ID and Outcome badge
+    const runIdDisplay = document.getElementById("active-test-run-id");
+    if (runIdDisplay) runIdDisplay.innerText = data.test_run_id;
+
+    const outcomeBadge = document.getElementById("active-outcome-badge");
+    if (outcomeBadge) {
+      outcomeBadge.innerText = data.outcome_type || data.status;
+      if (data.outcome_type === "POLICY_DENIED" || data.trapped) {
+        outcomeBadge.className = "status-pill status-quarantined";
+      } else if (data.outcome_type === "MODEL_REFUSAL") {
+        outcomeBadge.className = "status-pill status-threat";
+      } else {
+        outcomeBadge.className = "status-pill status-ready";
+      }
+    }
+
+    // 2. Update Workload PID display
+    const pidDisplay = document.getElementById("workload-pid-display");
+    if (pidDisplay) {
+      const pidText = data.workload_pid ? `PID: ${data.workload_pid} (Active Process)` : "PID: TERMINATED";
+      pidDisplay.innerText = `WORKLOAD ${pidText}`;
+    }
+
+    // 3. Update Latency Stat if quarantined
+    if (data.quarantined && typeof data.quarantine_latency_ms === "number" && data.quarantine_latency_ms > 0) {
+      const statLatency = document.getElementById("stat-latency");
+      if (statLatency) {
+        statLatency.innerText = `${data.quarantine_latency_ms.toFixed(2)} ms`;
+      }
+    }
+
+    // 4. Save to run history
+    this.runHistory.unshift({
+      run_id: data.test_run_id,
+      model: data.model_name || originalPayload.target_model,
+      prompt: (originalPayload.custom_prompt || "Template prompt").substring(0, 60),
+      workload_pid: data.workload_pid || "TERMINATED",
+      outcome: data.outcome_type || data.status,
+      trapped: data.trapped ? "YES" : "NO",
+      latency: typeof data.quarantine_latency_ms === "number" ? `${data.quarantine_latency_ms.toFixed(2)} ms` : "--",
+    });
+
+    // 5. Render verifiable diagnostic trace stages
+    this.renderTraceStages(data.trace_stages, data.outcome_type);
+  }
+
+  renderDiagnosticTrace(data) {
+    if (data && data.trace_stages) {
+      this.renderTraceStages(data.trace_stages, data.outcome_type);
+    }
+  }
+
+  renderTraceStages(stages, outcomeType) {
+    const container = document.getElementById("trace-stages-container");
+    if (!container) return;
+
+    if (!stages || stages.length === 0) {
+      container.innerHTML = '<div class="text-muted" style="font-size: 0.8rem;">No trace stages captured for this execution.</div>';
+      return;
+    }
+
+    container.innerHTML = "";
+    stages.forEach((stg, idx) => {
+      const stageBox = document.createElement("div");
+      stageBox.style.cssText = "background: var(--bg-tertiary); border: 1px solid var(--card-border); border-radius: 4px; padding: 8px 12px; font-family: 'Fira Code', monospace; font-size: 0.78rem;";
+
+      const timeStr = stg.timestamp ? new Date(stg.timestamp).toLocaleTimeString() : "--";
+      const evidenceStr = JSON.stringify(stg.evidence, null, 2);
+
+      stageBox.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <div>
+            <strong style="color: var(--accent-cyan);">[STAGE ${idx + 1}: ${stg.stage}]</strong>
+            <span style="color: var(--text-main); margin-left: 8px;">${stg.description}</span>
+          </div>
+          <span style="color: var(--text-dim); font-size: 0.7rem;">${timeStr}</span>
+        </div>
+        <details style="margin-top: 4px;">
+          <summary style="cursor: pointer; color: var(--accent-amber); font-size: 0.72rem;">View Verified Evidence Payload</summary>
+          <pre style="margin: 4px 0 0 0; padding: 6px; background: rgba(0,0,0,0.4); border-radius: 3px; font-size: 0.72rem; color: #a5b4fc; overflow-x: auto;">${evidenceStr}</pre>
+        </details>
+      `;
+      container.appendChild(stageBox);
+    });
+  }
+
+  async runFullTestSuite(useRealAgent = true) {
+    const suiteBtn = document.getElementById("btn-run-suite");
+    const sentryBtn = document.getElementById("btn-run-sentry-suite");
+    const activeBtn = useRealAgent ? suiteBtn : (sentryBtn || suiteBtn);
+    const originalText = activeBtn ? activeBtn.innerText : "RUN TEST MATRIX";
+    if (activeBtn) {
+      activeBtn.disabled = true;
+      activeBtn.innerText = useRealAgent ? "EVALUATING MODEL..." : "TESTING PEP SENTRY...";
+    }
+
+    try {
+      const res = await fetch("/api/attacks/run-suite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ use_real_agent: useRealAgent }),
+      });
+      if (res.ok) {
+        const scorecard = await res.json();
+        
+        // Update top-level HUD stats
+        const statInterception = document.getElementById("stat-interception");
+        if (statInterception) {
+          statInterception.innerText = `${scorecard.interception_success_rate_percent}%`;
+        }
+
+        const statLatency = document.getElementById("stat-latency");
+        if (statLatency) {
+          statLatency.innerText = `${scorecard.average_quarantine_latency_ms} ms`;
+        }
+
+        // Open detailed scorecard results panel
+        const modalTitle = useRealAgent
+          ? "Mode A: Model-Driven Red Team Evaluation Scorecard"
+          : "Mode B: Direct PEP Security Testing Scorecard (Bypasses LLM)";
+        this.openScorecardModal(modalTitle, scorecard);
+      } else {
+        alert("Failed to execute test matrix: " + res.statusText);
+      }
+    } catch (e) {
+      console.error("Suite execution error:", e);
+      alert("Test matrix error: " + e.message);
+    } finally {
+      if (activeBtn) {
+        activeBtn.disabled = false;
+        activeBtn.innerText = originalText;
+      }
+    }
+  }
+
+  async runAdversarialScenarios() {
+    const btn = document.getElementById("btn-run-scenarios");
+    const originalText = btn ? btn.innerText : "RUN ADVERSARIAL SCENARIOS";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "EVALUATING 8 SCENARIOS...";
+    }
+
+    try {
+      const res = await fetch("/api/scenarios/run", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        this.openScenariosScorecardModal("Section 8 Adversarial Evaluation Scorecard", data);
+      } else {
+        alert("Failed to run scenarios: " + res.statusText);
+      }
+    } catch (e) {
+      console.error("Scenario evaluation error:", e);
+      alert("Error running scenario suite: " + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = originalText;
+      }
+    }
+  }
+
+  async run20Techniques() {
+    const btn = document.getElementById("btn-run-techniques");
+    const originalText = btn ? btn.innerText : "Run 20 Techniques";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = "EVALUATING 20 TECHNIQUES...";
+    }
+    const modelSelector = document.getElementById("global-model-selector");
+    const targetModel = modelSelector ? modelSelector.value : "qwen2.5:3b";
+
+    try {
+      const listRes = await fetch("/api/techniques");
+      if (!listRes.ok) throw new Error("Failed to load technique list");
+      const techniques = await listRes.json();
+
+      let idx = 0;
+      for (const tech of techniques) {
+        idx++;
+        if (btn) btn.innerText = `EVALUATING (${idx}/20): ${tech.name.substring(0, 15)}...`;
+
+        const res = await fetch("/api/techniques/run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            technique_id: tech.id,
+            target_model: targetModel,
+            assistant_mode: this.chatAssistantMode || "company",
+          }),
+        });
+
+        if (res.ok) {
+          const evalData = await res.json();
+          const lastTurn = evalData.turns_executed && evalData.turns_executed.length > 0
+            ? evalData.turns_executed[evalData.turns_executed.length - 1]
+            : null;
+
+          const recordData = {
+            execution_id: evalData.execution_id,
+            timestamp: new Date().toISOString(),
+            model_name: evalData.target_model,
+            target_model: evalData.target_model,
+            model_decision: lastTurn ? lastTurn.model_decision : "NOT EXECUTED",
+            pep_decision: lastTurn ? lastTurn.pep_decision : "NOT EXECUTED",
+            tool_invocation: lastTurn && lastTurn.tool_proposal ? `${lastTurn.tool_proposal.tool}(...)` : "NOT EXECUTED",
+            resource_access_outcome: lastTurn ? lastTurn.resource_access_outcome : "NOT EXECUTED",
+            runtime_containment: lastTurn ? lastTurn.runtime_containment : "NOT EXECUTED",
+            outcome_type: evalData.final_outcome || (lastTurn ? lastTurn.outcome_type : "INCONCLUSIVE"),
+            audit_hash: evalData.audit_hash,
+            audit_block_index: evalData.audit_block_index,
+            runtime_isolation_claim: evalData.isolation_claim,
+            attack_category: evalData.category,
+            category: evalData.category,
+            trace_stages: [
+              {
+                stage: "TECHNIQUE_INGRESS",
+                execution_id: evalData.execution_id,
+                description: `Technique #${evalData.number}: ${evalData.name} (${evalData.category})`,
+                evidence: { technique_id: evalData.technique_id, is_multiturn: evalData.is_multiturn, turns: evalData.turns_executed.length },
+              },
+              {
+                stage: "MODEL_DECISION",
+                execution_id: evalData.execution_id,
+                description: `Model Decision: ${lastTurn ? lastTurn.model_decision : 'UNKNOWN'}`,
+                evidence: { raw_preview: lastTurn ? lastTurn.model_response_raw.substring(0, 150) : "" },
+              },
+              {
+                stage: "PEP_EVALUATION",
+                execution_id: evalData.execution_id,
+                description: `Zero-Trust PEP Decision: ${lastTurn ? lastTurn.pep_decision : 'NOT EXECUTED'}`,
+                evidence: { tool: lastTurn ? lastTurn.tool_proposal : null, verdict: evalData.final_verdict },
+              },
+              {
+                stage: "AUDIT_COMMITTED",
+                execution_id: evalData.execution_id,
+                description: `Audit Hash: ${evalData.audit_hash ? evalData.audit_hash.substring(0, 16) + '...' : 'NONE'}`,
+                evidence: { hash: evalData.audit_hash, block: evalData.audit_block_index },
+              },
+            ],
+          };
+
 
 }
