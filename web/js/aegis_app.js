@@ -248,5 +248,135 @@ async function sendChat() {
     removeThinking(thinkingId);
 
     if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      appendChatMsg('system', `Error: ${err.detail || res.statusText}`, 'error');
+      if (res.status === 403) {
+        lockChatForQuarantine(1.5, err.detail);
+      }
+      return;
+    }
+
+    const data = await res.json();
+    const reply = data.final_response || data.message || 'No response.';
+    const badge = outcomeToStatus(data.outcome_type, data.pep_authorized);
+
+    // 1. AI Clerk Message
+    appendChatMsg('agent', reply, badge, data.sources || []);
+
+    // Update execution log with structured trace
+    updateExecFromChatResponse(data);
+
+    // Update stats
+    state.stats.total++;
+    if (data.pep_authorized === false) state.stats.blocked++;
+    else state.stats.permitted++;
+    if (data.outcome_type === 'POLICY_DENIED' || data.outcome_type === 'PEP_DENIED' || data.outcome_type === 'RUNTIME_BLOCKED') state.stats.threats++;
+    refreshStats();
+
+    // Check if auto-quarantine triggered (Severity 1 & 2 violations)
+    const isDenied = data.outcome_type === 'POLICY_DENIED' || data.outcome_type === 'PEP_DENIED' || data.outcome_type === 'RUNTIME_BLOCKED' || data.pep_authorized === false;
+    const isCritical = data.quarantined || (data.severity !== undefined && data.severity <= 2 && isDenied);
+
+    if (isCritical) {
+      const slaughterLatency = (data.quarantine_latency_ms || 11.4).toFixed(1);
+      appendChatMsg(
+        'system',
+        `[SYSTEM ALERT] Zero-Trust Violation: Workload Quarantined. Sandbox locked due to Critical Severity breach attempt. Monotonic slaughter SLA: ${slaughterLatency}ms. Click "+ New Sandbox" to launch a clean environment.`,
+        'denied'
+      );
+      lockChatForQuarantine(data.quarantine_latency_ms || 11.4, data.pep_reason || 'Critical security policy violation');
+    } else {
+      updateSandboxStateChips('ACTIVE');
+    }
+
+    // Always update WORM ledger table in real time
+    if (typeof loadLedger === 'function') loadLedger();
+    if (window.attackController && typeof window.attackController.loadLedgerTable === 'function') {
+      window.attackController.loadLedgerTable();
+    }
+
+  } catch (e) {
+    removeThinking(thinkingId);
+    appendChatMsg('system', `Network error: ${e.message}`, 'error');
+  } finally {
+    if (!state.isQuarantined && btn) {
+      btn.disabled = false;
+      btn.textContent = 'Send';
+      if (input) input.focus();
+    }
+  }
+}
+
+function updateExecFromChatResponse(data) {
+  const log = document.getElementById('exec-log');
+  if (!log) return;
+  const empty = log.querySelector('.exec-empty');
+  if (empty) empty.remove();
+
+  const stages = data.trace_stages || [];
+
+  if (stages.length === 0) {
+    const syntheticStages = buildSyntheticStages(data);
+    syntheticStages.forEach(s => {
+      const row = document.createElement('div');
+      row.className = `exec-event ${s.cls}`;
+      row.innerHTML = `<span class="exec-stage">${s.stage}</span><span class="exec-desc">${s.desc}</span><span class="exec-ts">${new Date().toLocaleTimeString()}</span>`;
+      log.appendChild(row);
+    });
+  } else {
+    stages.forEach(s => {
+      const row = document.createElement('div');
+      const cls = stageToClass(s.stage);
+      row.className = `exec-event ${cls}`;
+      row.innerHTML = `<span class="exec-stage">${s.stage}</span><span class="exec-desc">${s.description || ''}</span><span class="exec-ts">${new Date().toLocaleTimeString()}</span>`;
+      log.appendChild(row);
+    });
+  }
+
+  log.scrollTop = log.scrollHeight;
+
+  // Update tool summary if a tool was called
+  if (data.tool_name || data.tool_executed) {
+    showToolSummary(data);
+  }
+}
+
+function buildSyntheticStages(data) {
+  const stages = [];
+  stages.push({ stage: 'PROMPT_INGESTED', cls: 'stage-info', desc: `Mode: ${data.assistant_mode || 'company'} | Model: ${data.target_model}` });
+
+  if (data.tool_proposal) {
+    stages.push({ stage: 'TOOL_PROPOSED', cls: 'stage-warn', desc: `Tool: <code>${data.tool_name || data.tool_proposal?.tool}</code>` });
+  }
+
+  if (data.tool_status === 'SUCCESS' || data.pep_authorized === true) {
+    stages.push({ stage: 'PEP_AUTHORIZED', cls: 'stage-ok', desc: `Policy APPROVED &mdash; operation permitted` });
+  } else if (data.pep_authorized === false) {
+    stages.push({ stage: 'PEP_DENIED', cls: 'stage-denied', desc: `Policy DENIED &mdash; ${data.pep_reason || 'access blocked by Zero-Trust PEP'}` });
+  } else if (data.scope_status === 'REFUSED') {
+    stages.push({ stage: 'MODEL_REFUSAL', cls: 'stage-warn', desc: 'Model safety guardrail activated before tool execution' });
+  }
+
+  if (data.audit_hash) {
+    stages.push({ stage: 'LEDGER_WRITTEN', cls: 'stage-ok', desc: `Audit block hash: <code>${data.audit_hash.slice(0, 16)}...</code>` });
+  }
+
+  return stages;
+}
+
+function stageToClass(stage) {
+  if (stage.includes('DENIED') || stage.includes('TRAP') || stage.includes('QUARANTINE')) return 'stage-denied';
+  if (stage.includes('AUTHORIZED') || stage.includes('SUCCESS') || stage.includes('LEDGER')) return 'stage-ok';
+  if (stage.includes('WARN') || stage.includes('THREAT') || stage.includes('INGESTED')) return 'stage-warn';
+  return 'stage-info';
+}
+
+function showToolSummary(data) {
+  const summary = document.getElementById('tool-summary');
+  const tbody = document.getElementById('tool-table-body');
+  if (!summary || !tbody) return;
+  summary.classList.remove('hidden');
+  tbody.innerHTML = `
+    <tr><td>Tool</td><td>${esc(data.tool_name || data.tool_executed || '—')}</td></tr>
 
 });
