@@ -648,5 +648,405 @@
                 <td><code>GET /api/company/hr/salaries</code></td>
                 <td>Tier 2 Confidential</td>
                 <td><span class="badge badge-blocked">DENIED (403)</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/company/hr/salaries');">Probe Endpoint</button></td>
+              </tr>
+              <tr>
+                <td><strong>Internal Department Budgets</strong></td>
+                <td><code>GET /api/company/finance/budgets</code></td>
+                <td>Tier 3 Internal</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/company/finance/budgets');">Probe Endpoint</button></td>
+              </tr>
+              <tr>
+                <td><strong>Restricted Finance Disbursements</strong></td>
+                <td><code>GET /api/company/finance/disbursements</code></td>
+                <td>Tier 1 Restricted</td>
+                <td><span class="badge badge-blocked">DENIED (403)</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/company/finance/disbursements');">Probe Endpoint</button></td>
+              </tr>
+              <tr>
+                <td><strong>Mock Metadata Service (SSRF)</strong></td>
+                <td><code>GET /api/mock-metadata/latest/meta-data</code></td>
+                <td>Cloud Metadata (IMDS)</td>
+                <td><span class="badge badge-blocked">TRAPPED (403)</span></td>
+                <td><button class="btn btn-secondary btn-sm" onclick="window.aegisAttackController.probeMockApi('/api/mock-metadata/latest/meta-data');">Probe Endpoint</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Live Captured API & Network Request Logs -->
+        <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.35rem;">
+          Actual Recorded HTTP &amp; Tool Request Logs (Live Backend Stream)
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Method</th>
+                <th>Target Endpoint / URL</th>
+                <th>Destination</th>
+                <th>Status Code</th>
+                <th>Policy Decision</th>
+                <th>Reason</th>
+                <th>Source</th>
+              </tr>
+            </thead>
+            <tbody id="company-api-logs-tbody">
+              <tr>
+                <td colspan="8" class="text-muted" style="text-align: center; padding: 1.5rem;">
+                  Loading live API request logs...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 5. Access Control Matrix -->
+      <div class="card-panel">
+        <div class="panel-header" style="margin-bottom: 0.5rem;">
+          <div>
+            <h3 class="panel-title" style="font-size: 0.95rem;">Access-Control Decision Matrix</h3>
+            <p class="panel-sub">Zero-Trust Policy Enforcement Point (PEP) authorization rules governing all agent operations.</p>
+          </div>
+          <span class="badge badge-blue">Deterministic Sentry Matrix</span>
+        </div>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Identity Mode</th>
+                <th>Target Resource</th>
+                <th>Operation</th>
+                <th>Policy Decision</th>
+                <th>Enforcement Mechanism</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>General Assistant Mode</strong></td>
+                <td>Company Documents, Database, or APIs</td>
+                <td>ANY</td>
+                <td><span class="badge badge-blocked">DENIED</span></td>
+                <td>Mode-based Identity Boundary Guard</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>Tier 4 Public Documents (e.g. <code>company_overview.md</code>)</td>
+                <td>READ</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td>PEP Centralized Sentry Permitted</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>Tier 3 Internal Documents (e.g. <code>employee_handbook.md</code>)</td>
+                <td>READ</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td>PEP Centralized Sentry Permitted</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>Tier 1/2 Restricted Documents (e.g. <code>confidential_salaries.csv</code>)</td>
+                <td>READ</td>
+                <td><span class="badge badge-blocked">DENIED</span></td>
+                <td>Zero-Trust Protected Document Rule</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>SQLite Permitted Tables (<code>customers</code>, <code>complaints</code>)</td>
+                <td>SELECT</td>
+                <td><span class="badge badge-permitted">AUTHORIZED</span></td>
+                <td>SQL Read-Only Parser Permitted</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>SQLite Restricted Table (<code>financial_records</code>)</td>
+                <td>SELECT / ANY</td>
+                <td><span class="badge badge-blocked">DENIED</span></td>
+                <td>Strict Table Whitelist Guard</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>SQLite Destructive DDL (<code>DROP</code>, <code>DELETE</code>, <code>UPDATE</code>)</td>
+                <td>MUTATION</td>
+                <td><span class="badge badge-blocked">DENIED</span></td>
+                <td>AST SQL Mutation Sentry</td>
+              </tr>
+              <tr>
+                <td><strong>Company Assistant Mode</strong></td>
+                <td>External IP / Cloud Metadata (<code>169.254.169.254</code>)</td>
+                <td>HTTP GET</td>
+                <td><span class="badge badge-blocked">DENIED</span></td>
+                <td>Zero-Trust Egress Firewall</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: RED ZONE &mdash; ADVERSARIAL TESTING & WORKBENCH                   -->
+    <!-- ========================================================================= -->
+    <section id="pane-red" class="tab-pane">
+      <div class="two-col-layout">
+
+        <!-- LEFT: Chat Interface -->
+        <div class="panel panel-red">
+          <div class="panel-header">
+            <span class="panel-badge red">RED</span>
+            <h2 class="panel-title">Red Team &mdash; Attack Studio</h2>
+            <div class="panel-actions" style="display:flex;gap:6px;">
+              <button class="btn btn-sm btn-outline btn-success" id="btn-new-sandbox" onclick="createNewSandbox()">+ New Sandbox</button>
+              <button class="btn btn-sm btn-outline" onclick="clearChat()">Clear Chat</button>
+            </div>
+          </div>
+
+          <!-- Mode selector -->
+          <div class="mode-bar">
+            <label class="mode-label">Agent Mode:</label>
+            <button class="mode-btn active" id="mode-company" onclick="setMode('company', this)">Company Assistant</button>
+            <button class="mode-btn" id="mode-general" onclick="setMode('general', this)">General Assistant</button>
+            <span class="mode-hint" id="mode-hint">Company documents, policies, and records only</span>
+          </div>
+
+          <!-- Predefined scenarios -->
+          <div class="scenarios-panel">
+            <div class="scenarios-label">Quick Scenarios:</div>
+            <div class="scenarios-list" id="scenarios-list">
+              <div class="scenario-loading">Loading scenarios&hellip;</div>
+            </div>
+          </div>
+
+          <!-- Chat messages -->
+          <div class="chat-log" id="chat-log">
+            <div class="chat-welcome">
+              <div class="welcome-icon"><span class="badge badge-neutral" style="font-size:0.8rem;letter-spacing:1px;font-weight:600;">AI SENTRY CLERK</span></div>
+              <div class="welcome-title">AegisHarness AI Clerk</div>
+              <div class="welcome-sub">Send a legitimate or adversarial message to begin the security test. All interactions are recorded and enforced by the Zero-Trust policy layer.</div>
+            </div>
+          </div>
+
+          <!-- Input bar -->
+          <div class="chat-input-bar">
+            <textarea id="chat-input" class="chat-input" placeholder="Type a message or select a scenario above&hellip;" rows="2" onkeydown="handleChatKey(event)"></textarea>
+            <button class="btn btn-primary" id="send-btn" onclick="sendChat()">Send</button>
+          </div>
+          <div class="input-hint">Press Enter to send (Shift+Enter for newline) &bull; Model: <span id="active-model-label">qwen2.5:3b</span></div>
+        </div>
+
+        <!-- RIGHT: Security Execution Panel -->
+        <div class="panel panel-target">
+          <div class="panel-header">
+            <span class="panel-badge yellow">TARGET</span>
+            <h2 class="panel-title">Execution Evidence</h2>
+            <span class="state-chip" id="sandbox-state-chip">IDLE</span>
+          </div>
+
+          <div class="exec-log" id="exec-log">
+            <div class="exec-empty">Security execution events will appear here when you send a message.</div>
+          </div>
+
+          <!-- Last tool call summary -->
+          <div class="tool-summary hidden" id="tool-summary">
+            <div class="tool-summary-header">Last Tool Execution</div>
+            <table class="tool-table">
+              <tbody id="tool-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="pane-target" class="tab-pane">
+      <div class="two-col-layout">
+
+        <!-- LEFT: File Vault -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-badge yellow">TARGET</span>
+            <h2 class="panel-title">Sandbox File Vault</h2>
+            <button class="btn btn-sm btn-outline" onclick="loadSandboxFiles()">&#x21BA; Refresh</button>
+          </div>
+
+          <div class="file-tiers">
+            <div class="tier tier-approved">
+              <div class="tier-header">
+                <span class="tier-dot green"></span>
+                <strong>Approved Documents</strong>
+                <span class="tier-note">Agent can read these</span>
+              </div>
+              <div id="approved-files" class="file-list">Loading&hellip;</div>
+            </div>
+            <div class="tier tier-restricted">
+              <div class="tier-header">
+                <span class="tier-dot red"></span>
+                <strong>Restricted / Protected</strong>
+                <span class="tier-note">PEP blocks all access</span>
+              </div>
+              <div id="restricted-files" class="file-list">Loading&hellip;</div>
+            </div>
+            <div class="tier tier-db">
+              <div class="tier-header">
+                <span class="tier-dot blue"></span>
+                <strong>Database Tables</strong>
+                <span class="tier-note">financial_records blocked</span>
+              </div>
+              <div id="db-tables" class="file-list">Loading&hellip;</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: File Preview & Sandbox State -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-badge yellow">TARGET</span>
+            <h2 class="panel-title">File Preview</h2>
+          </div>
+
+          <div class="sandbox-info" id="sandbox-info">
+            <div class="info-row"><span class="info-lbl">Sandbox State</span><span class="state-chip" id="sandbox-state-detail">IDLE</span></div>
+            <div class="info-row"><span class="info-lbl">Isolation Mode</span><span class="info-val">Application-level tool isolation + Synthetic VFS</span></div>
+            <div class="info-row"><span class="info-lbl">Network Egress</span><span class="info-val text-danger">Default-Deny (SSRF blocked)</span></div>
+            <div class="info-row"><span class="info-lbl">Path Traversal Guard</span><span class="info-val" style="color:var(--accent-emerald)">Active</span></div>
+            <div class="info-row"><span class="info-lbl">Protected Assets</span><span class="info-val text-danger">Read-only enforced</span></div>
+          </div>
+
+          <div class="file-preview" id="file-preview">
+            <div class="preview-placeholder">&#x21B3; Click a file to preview its content</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 5: BLUE ZONE &mdash; MONITORING, AUDIT & INCIDENT CONTAINMENT         -->
+    <!-- ========================================================================= -->
+    <section id="pane-blue" class="tab-pane">
+
+      <!-- SOC Global Metrics Panel -->
+      <div class="soc-metrics-panel">
+        <div class="soc-metrics-header">
+          <div>
+            <h2 class="soc-metrics-title">Security Operations Center (SOC) Global Metrics</h2>
+            <p class="soc-metrics-sub">Dynamically aggregated from persisted execution records and zero-trust policy telemetry.</p>
+          </div>
+          <div class="soc-metrics-header-right">
+            <div class="soc-status-box">
+              <span class="info-lbl">SANDBOX:</span>
+              <span class="state-chip state-ready" id="stat-sandbox-state">READY</span>
+            </div>
+            <div class="soc-pill">
+              <span class="dot dot-green"></span>
+              <span>SOC REAL-TIME STORE</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 14 Metrics Grid -->
+        <div class="soc-metrics-grid">
+          <div class="metric-card"><div class="metric-num" id="stat-campaigns">0</div><div class="metric-lbl">TOTAL CAMPAIGNS</div><div class="metric-sub">Automated Suites</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-total">0</div><div class="metric-lbl">ATTACKS EXECUTED</div><div class="metric-sub">Total Payloads</div></div>
+          <div class="metric-card"><div class="metric-num text-danger" id="stat-threats">0</div><div class="metric-lbl">SUCCESSFUL JAILBREAKS</div><div class="metric-sub">Model Bypassed</div></div>
+          <div class="metric-card"><div class="metric-num text-warning" id="stat-refusals">0</div><div class="metric-lbl">MODEL REFUSALS</div><div class="metric-sub">Pre-Tool Refused</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-tool-proposals">0</div><div class="metric-lbl">TOOL PROPOSALS</div><div class="metric-sub">Dispatched to PEP</div></div>
+          <div class="metric-card"><div class="metric-num text-warning" id="stat-blocked">0</div><div class="metric-lbl">PEP DENIALS</div><div class="metric-sub">Zero-Trust Drops</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-permitted">0</div><div class="metric-lbl">AUTHORIZED OPS</div><div class="metric-sub">Approved</div></div>
+          <div class="metric-card"><div class="metric-num text-danger" id="stat-resource-violations">0</div><div class="metric-lbl">RESOURCE VIOLATIONS</div><div class="metric-sub">Restricted Hits</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-runtime-blocks">0</div><div class="metric-lbl">RUNTIME BLOCKS</div><div class="metric-sub">Traversal/Egress</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-breaches">0</div><div class="metric-lbl">CONFIRMED BREACHES</div><div class="metric-sub">Data Exfiltrated</div></div>
+          <div class="metric-card"><div class="metric-num text-danger" id="stat-quarantines">0</div><div class="metric-lbl">QUARANTINE EVENTS</div><div class="metric-sub">Triggered Slaughters</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-containments">0</div><div class="metric-lbl">CONTAINMENTS</div><div class="metric-sub">PID Terminated</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-ledger">0</div><div class="metric-lbl">LEDGER BLOCKS</div><div class="metric-sub">Cryptographic Blocks</div></div>
+          <div class="metric-card"><div class="metric-num" id="stat-integrity">Valid</div><div class="metric-lbl">CHAIN INTEGRITY</div><div class="metric-sub">Tamper-Proof WORM</div></div>
+        </div>
+
+        <!-- Category / Severity Charts -->
+        <div class="soc-charts-grid">
+          <div class="soc-chart-card">
+            <div class="soc-chart-header"><strong>Adversarial Attacks by Category</strong><span class="soc-chart-tag">Classification Density</span></div>
+            <div class="chart-bars" id="category-bars">
+              <div class="chart-bar-row"><span class="chart-lbl">Conversational</span><div class="chart-bar-track"><div class="chart-bar bar-blue" id="bar-cat-conv" style="width:0%"></div></div><span class="chart-count" id="cnt-cat-conv">0 attacks</span></div>
+              <div class="chart-bar-row"><span class="chart-lbl">Company Resource Jailbreaks</span><div class="chart-bar-track"><div class="chart-bar bar-blue" id="bar-cat-jailbreak" style="width:0%"></div></div><span class="chart-count" id="cnt-cat-jailbreak">0 attacks</span></div>
+              <div class="chart-bar-row"><span class="chart-lbl">Red Team Chat</span><div class="chart-bar-track"><div class="chart-bar bar-blue" id="bar-cat-chat" style="width:0%"></div></div><span class="chart-count" id="cnt-cat-chat">0 attacks</span></div>
+              <div class="chart-bar-row"><span class="chart-lbl">Multi-Turn Attacks</span><div class="chart-bar-track"><div class="chart-bar bar-blue" id="bar-cat-multiturn" style="width:0%"></div></div><span class="chart-count" id="cnt-cat-multiturn">0 attacks</span></div>
+            </div>
+          </div>
+          <div class="soc-chart-card">
+            <div class="soc-chart-header"><strong>Threat Severity &amp; Outcome Split</strong><span class="soc-chart-tag">Defense Distribution</span></div>
+            <div class="chart-bars" id="soc-sev-bars">
+              <div class="chart-bar-row"><span class="chart-lbl sev4-text">SEV-4_INFO</span><div class="chart-bar-track"><div class="chart-bar sev4-bar" id="bar-soc-sev4" style="width:0%"></div></div><span class="chart-count" id="cnt-soc-sev4">0 incidents</span></div>
+              <div class="chart-bar-row"><span class="chart-lbl sev2-text">SEV-2_HIGH</span><div class="chart-bar-track"><div class="chart-bar sev2-bar" id="bar-soc-sev2" style="width:0%"></div></div><span class="chart-count" id="cnt-soc-sev2">0 incidents</span></div>
+              <div class="chart-bar-row"><span class="chart-lbl sev1-text">SEV-1_CRITICAL</span><div class="chart-bar-track"><div class="chart-bar sev1-bar" id="bar-soc-sev1" style="width:0%"></div></div><span class="chart-count" id="cnt-soc-sev1">0 incidents</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col-layout">
+
+        <!-- LEFT: Security Event Feed -->
+        <div class="panel panel-blue">
+          <div class="panel-header">
+            <span class="panel-badge blue">BLUE</span>
+            <h2 class="panel-title">Security Event Feed</h2>
+            <div class="panel-actions">
+              <button class="btn btn-sm btn-outline" onclick="loadLedger()">&#x21BA; Refresh</button>
+              <button class="btn btn-sm btn-outline" onclick="verifyChain()">Verify Chain</button>
+            </div>
+          </div>
+
+          <div class="sev-filter">
+            <span class="filter-label">Filter:</span>
+            <button class="sev-btn active" data-sev="all" onclick="filterEvents('all', this)">All</button>
+            <button class="sev-btn sev1" data-sev="SEV-1_CRITICAL" onclick="filterEvents('SEV-1_CRITICAL', this)">SEV-1</button>
+            <button class="sev-btn sev2" data-sev="SEV-2_HIGH" onclick="filterEvents('SEV-2_HIGH', this)">SEV-2</button>
+            <button class="sev-btn sev3" data-sev="SEV-3_MEDIUM" onclick="filterEvents('SEV-3_MEDIUM', this)">SEV-3</button>
+            <button class="sev-btn sev4" data-sev="SEV-4_INFO" onclick="filterEvents('SEV-4_INFO', this)">INFO</button>
+          </div>
+
+          <div class="event-log" id="event-log">
+            <div class="event-empty">Loading audit events&hellip;</div>
+          </div>
+        </div>
+
+        <!-- RIGHT: Chain Integrity & Quarantine Panel -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-badge blue">BLUE</span>
+            <h2 class="panel-title">Ledger Integrity &amp; Quarantine</h2>
+          </div>
+
+          <div class="chain-card" id="chain-card">
+            <div class="chain-icon" id="chain-icon"><span class="badge badge-neutral" style="font-size:0.75rem;padding:4px 8px;">SHA-256</span></div>
+            <div>
+              <div class="chain-status" id="chain-status">Not yet verified</div>
+              <div class="chain-detail" id="chain-detail">Click &ldquo;Verify Chain&rdquo; to check SHA-256 hash chain integrity.</div>
+            </div>
+            <div class="chain-meta">
+              <div>Blocks: <strong id="chain-blocks">-</strong></div>
+              <div>Tip: <code id="chain-tip">-</code></div>
+            </div>
+          </div>
+
+          <div class="quarantine-panel">
+            <div class="panel-header" style="border:none;padding:0;margin-bottom:0.75rem;">
+              <span class="panel-badge red">RED</span>
+              <h2 class="panel-title">Operator Kill Switch</h2>
+            </div>
+            <div class="quarantine-form">
+              <input id="quarantine-session" class="quarantine-input" type="text" placeholder="Session ID to quarantine&hellip;" />
+              <button class="btn btn-danger" onclick="triggerManualQuarantine()">Kill Workload</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 6: AUDIT LEDGER &mdash; CRYPTOGRAPHIC WORM PROOFS & FORENSICS         -->
+    <!-- ========================================================================= -->
+    <section id="pane-ledger" class="tab-pane">
 
 </div></body></html>
