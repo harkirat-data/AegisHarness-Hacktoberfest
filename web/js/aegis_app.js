@@ -378,5 +378,145 @@ function showToolSummary(data) {
   summary.classList.remove('hidden');
   tbody.innerHTML = `
     <tr><td>Tool</td><td>${esc(data.tool_name || data.tool_executed || '—')}</td></tr>
+    <tr><td>Status</td><td>${esc(data.tool_status || '—')}</td></tr>
+    <tr><td>Policy</td><td>${data.pep_authorized ? '<span class="text-green">AUTHORIZED</span>' : '<span class="text-red">DENIED</span>'}</td></tr>
+    <tr><td>Outcome</td><td>${esc(data.outcome_type || '—')}</td></tr>
+    <tr><td>Latency</td><td>${data.latency_ms || '—'}ms</td></tr>
+    ${data.audit_hash ? `<tr><td>Audit Hash</td><td class="mono">${data.audit_hash.slice(0, 20)}...</td></tr>` : ''}
+  `;
+}
+
+function outcomeToStatus(outcomeType, pepAuthorized) {
+  if (outcomeType === 'POLICY_DENIED' || outcomeType === 'PEP_DENIED' || outcomeType === 'RUNTIME_BLOCKED') return 'denied';
+  if (outcomeType === 'MODEL_REFUSAL') return 'refused';
+  if (pepAuthorized === false) return 'denied';
+  if (outcomeType === 'EXECUTION_ERROR') return 'error';
+  return 'ok';
+}
+
+function appendChatMsg(role, text, status, sources = []) {
+  const log = document.getElementById('chat-log');
+  if (!log) return;
+  const welcome = log.querySelector('.chat-welcome');
+  if (welcome) welcome.remove();
+
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+
+  const avatarText = role === 'user' ? 'YOU' : role === 'system' ? 'SYS' : 'CLERK';
+  const avatarCls = role === 'user' ? 'avatar-user' : role === 'system' ? 'avatar-system' : 'avatar-agent';
+
+  let badgeHtml = '';
+  if (status && role !== 'user') {
+    const badgeMap = { ok: 'badge-ok', denied: 'badge-denied', refused: 'badge-refused', info: 'badge-info', error: 'badge-error' };
+    const badgeLbl = { ok: 'PERMITTED', denied: 'BLOCKED', refused: 'REFUSED', info: 'INFO', error: 'ERROR' };
+    badgeHtml = `<span class="msg-badge ${badgeMap[status] || 'badge-info'}">${badgeLbl[status] || status.toUpperCase()}</span>`;
+  }
+
+  let sourcesHtml = '';
+  if (sources.length) {
+    sourcesHtml = `<div class="msg-sources" style="font-size:10px;color:var(--text-dim);margin-top:4px;">Sources: ${sources.map(s => `<code style="font-size:10px;">${esc(s)}</code>`).join(', ')}</div>`;
+  }
+
+  div.innerHTML = `
+    <div class="msg-avatar ${avatarCls}">${avatarText}</div>
+    <div class="msg-body">
+      <div class="msg-meta">
+        <span>${role === 'user' ? 'Operator' : role === 'system' ? 'Aegis Sentry' : 'AI Clerk'}</span>
+        ${badgeHtml}
+        <span>${new Date().toLocaleTimeString()}</span>
+      </div>
+      <div class="msg-text">${esc(text)}</div>
+      ${sourcesHtml}
+    </div>
+  `;
+
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function appendThinking() {
+  const log = document.getElementById('chat-log');
+  if (!log) return '';
+  const id = `thinking-${Date.now()}`;
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = 'chat-msg agent';
+  div.innerHTML = `
+    <div class="msg-avatar avatar-agent">CLERK</div>
+    <div class="msg-body"><div class="thinking">Evaluating prompt against zero-trust policy...</div></div>
+  `;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  return id;
+}
+
+function removeThinking(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function clearChat() {
+  const log = document.getElementById('chat-log');
+  if (log) {
+    log.innerHTML = `<div class="chat-welcome"><div class="welcome-icon"><span class="badge badge-neutral">AI SENTRY CLERK</span></div><div class="welcome-title">AegisHarness AI Clerk</div><div class="welcome-sub">Chat cleared. Ready for next test.</div></div>`;
+  }
+  const execLog = document.getElementById('exec-log');
+  if (execLog) {
+    execLog.innerHTML = `<div class="exec-empty">Security execution events will appear here when you send a message.</div>`;
+  }
+  const toolSum = document.getElementById('tool-summary');
+  if (toolSum) toolSum.classList.add('hidden');
+  state.sessionId = `ui-${Date.now()}`;
+  state.chatHistory = [];
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ===== SCENARIOS =====
+async function loadScenarios() {
+  try {
+    const res = await fetch('/api/scenarios');
+    const data = await res.json();
+    renderScenarios(data.scenarios || []);
+  } catch { /* non-critical */ }
+}
+
+function renderScenarios(scenarios) {
+  const container = document.getElementById('scenarios-list');
+  if (!container) return;
+  container.innerHTML = '';
+  scenarios.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = `scenario-btn ${s.is_adversarial ? 'adversarial' : ''}`;
+    btn.title = s.description;
+    btn.textContent = s.name;
+    btn.onclick = () => {
+      const input = document.getElementById('chat-input');
+      if (input) {
+        input.value = s.prompt;
+        input.focus();
+      }
+    };
+    container.appendChild(btn);
+  });
+}
+
+// ===== SANDBOX FILES =====
+async function loadSandboxFiles() {
+  try {
+    const [filesRes, statusRes] = await Promise.all([
+      fetch('/api/demo/files'),
+      fetch('/api/demo/status'),
+    ]);
+    const files = await filesRes.json();
+    const status = await statusRes.json();
+    renderSandboxFiles(files, status);
+  } catch (e) {
+    const appEl = document.getElementById('approved-files');
+    if (appEl) appEl.textContent = 'Failed to load';
+  }
 
 });
