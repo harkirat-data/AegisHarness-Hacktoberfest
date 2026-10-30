@@ -1198,5 +1198,355 @@ class AttackController {
           id: data.drill_id,
           time: new Date().toLocaleTimeString(),
           category: "SIMULATED_BREACH_DRILL",
+          llmReaction: "ISOLATED_CANARY_FIXTURE (No LLM Access)",
+          enforcement: `CONTAINMENT_SLAUGHTER (${data.slaughter_latency_ms}ms)`,
+          severity: "SEV-1_CRITICAL (DRILL)",
+          remediation: `OPERATOR DRILL COMPLETE: Process killed in ${data.slaughter_latency_ms}ms. Committed to WORM Block #${data.audit_record_index}. Note: Real zero-trust PEP remains 100% defended.`,
+          status: "SIMULATED_BREACH_CONTAINED",
+          isBreach: false,
+          isSimulatedDrill: true
+        });
+
+        // Add to Blue Stream
+        const stream = document.getElementById("blue-events-stream");
+        if (stream) {
+          const line = document.createElement("div");
+          line.style.cssText = "margin-bottom: 4px; padding-bottom: 4px; border-bottom: 1px solid #1e293b; background: rgba(245, 158, 11, 0.1); padding: 4px 6px; border-radius: 3px;";
+          line.innerHTML = `
+            <span class="text-muted">[${new Date().toLocaleTimeString()}]</span>
+            <strong class="text-amber">[OPERATOR DRILL]</strong>
+            <span class="text-amber font-bold">SIMULATED BREACH EXECUTED</span>
+            <span class="badge badge-blocked" style="font-size:0.65rem;">CONTAINED (${data.slaughter_latency_ms}ms)</span>
+            <span style="color:#94a3b8; font-size:0.7rem;">(WORM Block #${data.audit_record_index})</span>
+            <div style="font-size:0.68rem; color:#fef3c7; margin-top:2px;">Target: ${data.target_fixture} &bull; Canary snippet: <code>${data.canary_data_snippet.substring(0, 40)}...</code></div>
+          `;
+          stream.insertBefore(line, stream.firstChild);
+        }
+
+        alert(`SIMULATED BREACH DRILL COMPLETED\n\n• Target Fixture: ${data.target_fixture}\n• Slaughter Latency: ${data.slaughter_latency_ms} ms\n• WORM Ledger Block: #${data.audit_record_index}\n• Real PEP Invariant: 100% INTACT (Zero real breaches)`);
+        await this.loadBlueEvents();
+        await this.loadSOCDashboard();
+        await this.loadSOCIncidents();
+      } else {
+        alert("Simulated breach drill failed: " + res.statusText);
+      }
+    } catch (e) {
+      alert("Simulated breach drill error: " + e.message);
+    }
+  }
+
+  bindUI() {
+    const select = document.getElementById("attack-select");
+    if (select) {
+      select.addEventListener("change", (e) => this.onAttackSelected(e.target.value));
+    }
+
+    const busBtn = document.getElementById("mode-business-btn");
+    if (busBtn) {
+      busBtn.addEventListener("click", () => this.setWorkbenchMode("business"));
+    }
+
+    const secBtn = document.getElementById("mode-security-btn");
+    if (secBtn) {
+      secBtn.addEventListener("click", () => this.setWorkbenchMode("security"));
+    }
+
+    const fireBtn = document.getElementById("btn-fire-attack");
+    if (fireBtn) {
+      fireBtn.addEventListener("click", () => this.launchSingleAttack());
+    }
+
+    const campBtn = document.getElementById("btn-run-campaign") || document.getElementById("btn-run-techniques");
+    if (campBtn) {
+      campBtn.addEventListener("click", () => this.start20Campaign());
+    }
+
+    const cancelCampBtn = document.getElementById("btn-cancel-campaign");
+    if (cancelCampBtn) {
+      cancelCampBtn.addEventListener("click", () => this.cancelActiveCampaign());
+    }
+
+    const jbBtn = document.getElementById("btn-open-jailbreaks");
+    if (jbBtn) {
+      jbBtn.addEventListener("click", () => this.openJailbreakLibrary());
+    }
+
+    const closeJbBtn = document.getElementById("btn-close-jailbreak-modal");
+    if (closeJbBtn) {
+      closeJbBtn.addEventListener("click", () => {
+        const m = document.getElementById("jailbreak-modal");
+        if (m) m.classList.add("hidden");
+      });
+    }
+
+    const loadJbBtn = document.getElementById("btn-load-jailbreak-to-chat");
+    if (loadJbBtn) {
+      loadJbBtn.addEventListener("click", () => this.loadSelectedJailbreakIntoChat());
+    }
+
+    const runJbBtn = document.getElementById("btn-run-jailbreak-scenario");
+    if (runJbBtn) {
+      runJbBtn.addEventListener("click", () => this.runSelectedJailbreakScenario());
+    }
+
+    const scrollChatBtn = document.getElementById("btn-scroll-chat");
+    if (scrollChatBtn) {
+      scrollChatBtn.addEventListener("click", () => {
+        const inp = document.getElementById("chat-input");
+        if (inp) {
+          inp.focus();
+          inp.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      });
+    }
+
+    const refreshIncBtn = document.getElementById("btn-refresh-incidents");
+    if (refreshIncBtn) {
+      refreshIncBtn.addEventListener("click", () => this.loadSOCIncidents());
+    }
+
+    const closeIncBtn = document.getElementById("btn-close-incident-modal");
+    if (closeIncBtn) {
+      closeIncBtn.addEventListener("click", () => {
+        const m = document.getElementById("incident-detail-modal");
+        if (m) m.classList.add("hidden");
+      });
+    }
+
+    const suiteBtn = document.getElementById("btn-run-suite");
+    if (suiteBtn) {
+      suiteBtn.addEventListener("click", () => this.runFullTestSuite(true));
+    }
+
+    const sentryBtn = document.getElementById("btn-run-sentry-suite");
+    if (sentryBtn) {
+      sentryBtn.addEventListener("click", () => this.runFullTestSuite(false));
+    }
+
+    const scenariosBtn = document.getElementById("btn-run-scenarios");
+    if (scenariosBtn) {
+      scenariosBtn.addEventListener("click", () => this.runAdversarialScenarios());
+    }
+
+    const manualKillBtn = document.getElementById("btn-manual-quarantine");
+    if (manualKillBtn) {
+      manualKillBtn.addEventListener("click", () => this.triggerManualKill());
+    }
+
+    const resetBtn1 = document.getElementById("btn-reset-demo");
+    if (resetBtn1) {
+      resetBtn1.addEventListener("click", () => this.resetDemoEnvironment());
+    }
+
+    const resetBtn2 = document.getElementById("btn-overview-reset");
+    if (resetBtn2) {
+      resetBtn2.addEventListener("click", () => this.resetDemoEnvironment());
+    }
+
+    const historyBtn = document.getElementById("btn-view-history");
+    if (historyBtn) {
+      historyBtn.addEventListener("click", () => this.openHistoryModal());
+    }
+
+    const closeHistoryBtn = document.getElementById("btn-close-history");
+    if (closeHistoryBtn) {
+      closeHistoryBtn.addEventListener("click", () => {
+        const modal = document.getElementById("history-modal");
+        if (modal) modal.classList.add("hidden");
+      });
+    }
+
+    const closeScBtn = document.getElementById("btn-close-scorecard");
+    if (closeScBtn) {
+      closeScBtn.addEventListener("click", () => {
+        const modal = document.getElementById("scorecard-modal");
+        if (modal) modal.classList.add("hidden");
+      });
+    }
+
+    const verifyBtn = document.getElementById("btn-verify-ledger");
+    if (verifyBtn) {
+      verifyBtn.addEventListener("click", () => this.openForensicModal());
+    }
+
+    const closeBtn = document.getElementById("btn-close-modal");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", () => {
+        const modal = document.getElementById("forensic-modal");
+        if (modal) modal.classList.add("hidden");
+      });
+    }
+
+    // Model Selector
+    const modelSel = document.getElementById("global-model-selector");
+    if (modelSel) {
+      modelSel.addEventListener("change", (e) => this.selectTargetModel(e.target.value));
+    }
+
+    // Red Team Custom Dispatcher & Presets
+    const redPreset = document.getElementById("red-preset-select");
+    if (redPreset) {
+      redPreset.addEventListener("change", (e) => {
+        const chatInput = document.getElementById("chat-input");
+        if (chatInput && e.target.value) {
+          chatInput.value = e.target.value;
+          chatInput.focus();
+        }
+      });
+    }
+
+    // Direct PEP Testing Controls
+    const directPreset = document.getElementById("direct-pep-preset");
+    if (directPreset) {
+      directPreset.addEventListener("change", (e) => {
+        const val = e.target.value;
+        if (!val) return;
+        const parts = val.split(":");
+        const type = parts[0];
+        const arg = parts[1];
+        const mode = parts[2] || "company";
+
+        const toolSel = document.getElementById("direct-pep-tool");
+        const argInp = document.getElementById("direct-pep-arg");
+        const modeSel = document.getElementById("direct-pep-mode");
+
+        if (type === "doc" && toolSel) toolSel.value = "read_document";
+        if (type === "db" && toolSel) toolSel.value = "query_database";
+        if (type === "api" && toolSel) toolSel.value = "call_internal_api";
+
+        if (argInp) argInp.value = arg;
+        if (modeSel) modeSel.value = mode;
+      });
+    }
+
+    const btnDirectPep = document.getElementById("btn-direct-pep-test");
+    if (btnDirectPep) {
+      btnDirectPep.addEventListener("click", () => this.executeDirectPEPTest());
+    }
+
+    const clearTestsBtn = document.getElementById("btn-clear-tests");
+    if (clearTestsBtn) {
+      clearTestsBtn.addEventListener("click", () => {
+        const tbody = document.getElementById("security-tests-tbody");
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-muted" style="text-align: center; padding: 1.5rem;">0 tests recorded in this session. Submit an inquiry in the chat or click "Evaluate Direct PEP" to begin.</td></tr>';
+        }
+        this.testMetrics = { attempted: 0, modelRefusals: 0, pepDenials: 0, confirmedBreaches: 0, runtimeBlocked: 0, quarantines: 0 };
+        const att = document.getElementById("test-count-attempted");
+        if (att) att.innerText = "0";
+        const ref = document.getElementById("test-count-refusals");
+        if (ref) ref.innerText = "0";
+        const den = document.getElementById("test-count-pep-denials");
+        if (den) den.innerText = "0";
+        const bre = document.getElementById("test-count-breaches");
+        if (bre) bre.innerText = "0";
+        const runBlk = document.getElementById("test-count-runtime-blocked");
+        if (runBlk) runBlk.innerText = "0";
+        const quar = document.getElementById("test-count-quarantines");
+        if (quar) quar.innerText = "0";
+        const rate = document.getElementById("test-pep-defense-rate");
+        if (rate) {
+          rate.innerText = "INSUFFICIENT DATA";
+          rate.className = "metric-tile-val text-blue";
+        }
+        const note = document.getElementById("test-pep-defense-note");
+        if (note) note.innerText = "0 evaluated checks";
+        const activeRun = document.getElementById("active-test-run-id");
+        if (activeRun) activeRun.innerText = "NONE";
+      });
+    }
+
+    // Company Environment Explorer buttons
+    const refCompBtn = document.getElementById("btn-refresh-company");
+    if (refCompBtn) {
+      refCompBtn.addEventListener("click", () => {
+        this.loadCompanyZone();
+        this.loadCompanyApiLogs();
+      });
+    }
+
+    const refLogsBtn = document.getElementById("btn-refresh-api-logs");
+    if (refLogsBtn) {
+      refLogsBtn.addEventListener("click", () => this.loadCompanyApiLogs());
+    }
+
+    const resetCompBtn = document.getElementById("btn-reset-company");
+    if (resetCompBtn) {
+      resetCompBtn.addEventListener("click", () => this.resetDemoEnvironment());
+    }
+
+
+    // Blue Team Operations
+    const blueKillBtn = document.getElementById("btn-blue-kill");
+    if (blueKillBtn) {
+      blueKillBtn.addEventListener("click", () => this.triggerManualKill());
+    }
+
+    const blueRefBtn = document.getElementById("btn-blue-refresh");
+    if (blueRefBtn) {
+      blueRefBtn.addEventListener("click", () => this.loadBlueEvents());
+    }
+
+    const clearStreamBtn = document.getElementById("btn-clear-blue-stream");
+    if (clearStreamBtn) {
+      clearStreamBtn.addEventListener("click", () => {
+        const stream = document.getElementById("blue-events-stream");
+        if (stream) stream.innerHTML = '<div class="text-muted">[BLUE-SOC] Stream feed cleared. Listening for incoming events...</div>';
+      });
+    }
+
+    const simBreachBtn = document.getElementById("btn-operator-sim-breach");
+    if (simBreachBtn) {
+      simBreachBtn.addEventListener("click", () => this.triggerSimulatedBreachDrill());
+    }
+
+    // Clear Audit Ledger
+    const clearLedgerBtn = document.getElementById("btn-clear-ledger");
+    if (clearLedgerBtn) {
+      clearLedgerBtn.addEventListener("click", () => this.clearAuditLedger());
+    }
+
+    const togglePepBtn = document.getElementById("btn-toggle-strict-pep");
+    if (togglePepBtn) {
+      togglePepBtn.addEventListener("click", () => this.toggleStrictPEP());
+    }
+
+    // AI Workbench Chat Interface Bindings
+    const btnCompany = document.getElementById("btn-mode-company");
+    if (btnCompany) {
+      btnCompany.addEventListener("click", () => this.setAssistantMode("company"));
+    }
+
+    const btnGeneral = document.getElementById("btn-mode-general");
+    if (btnGeneral) {
+      btnGeneral.addEventListener("click", () => this.setAssistantMode("general"));
+    }
+
+    const modeSelect = document.getElementById("chat-assistant-mode-select");
+    if (modeSelect) {
+      modeSelect.addEventListener("change", (e) => this.setAssistantMode(e.target.value));
+    }
+
+    const btnNewChat = document.getElementById("btn-new-chat") || document.getElementById("btn-chat-reset");
+    if (btnNewChat) {
+      btnNewChat.addEventListener("click", () => this.resetChat());
+    }
+
+    const btnToggleTech = document.getElementById("btn-toggle-tech-panel");
+    if (btnToggleTech) {
+      btnToggleTech.addEventListener("click", () => {
+        const panel = document.getElementById("workbench-tech-panel");
+        if (panel) {
+          panel.classList.toggle("hidden");
+          btnToggleTech.innerText = panel.classList.contains("hidden") ? "Show Technical Observation Panel" : "Hide Technical Panel";
+        }
+      });
+    }
+
+    const btnSendChat = document.getElementById("btn-send-chat") || document.getElementById("btn-chat-send");
+    if (btnSendChat) {
+      btnSendChat.addEventListener("click", () => this.sendChatMessage());
+    }
+
 
 }
