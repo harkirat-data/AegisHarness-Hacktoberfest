@@ -898,5 +898,305 @@ class AttackController {
           badgeEl.innerText = data.classification || classification;
           badgeEl.className = (data.classification || classification).includes("RESTRICTED") ? "badge badge-blocked" : "badge badge-permitted";
           badgeEl.classList.remove("hidden");
+        }
+        if (contentEl) contentEl.innerText = data.content;
+      } else {
+        if (nameEl) nameEl.innerText = `${filename} (${relPath})`;
+        if (sizeEl) sizeEl.innerText = sizeFormatted;
+        if (badgeEl) {
+          badgeEl.innerText = classification;
+          badgeEl.className = "badge badge-blocked";
+          badgeEl.classList.remove("hidden");
+        }
+        if (contentEl) contentEl.innerText = `[ZERO-TRUST POLICY PREVIEW]\nAccess to raw file '${filename}' is restricted. To inspect, run direct security evaluation.`;
+      }
+    } catch (e) {
+      console.error("Inspect error:", e);
+    }
+  }
+
+  async loadCompanyApiLogs() {
+    try {
+      const res = await fetch("/api/company/api-logs?limit=30");
+      if (!res.ok) return;
+      const data = await res.json();
+      const tbody = document.getElementById("company-api-logs-tbody");
+      if (!tbody) return;
+
+      if (!data.logs || data.logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-muted" style="text-align: center; padding: 1.5rem;">No API requests recorded yet. Click "Probe Endpoint" above to test an endpoint.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = "";
+      data.logs.forEach((log) => {
+        const tr = document.createElement("tr");
+        const is200 = log.status_code === 200;
+        const timeStr = log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : "--";
+        tr.innerHTML = `
+          <td class="text-muted font-mono" style="font-size:0.7rem;">${timeStr}</td>
+          <td><span class="badge badge-neutral">${log.method}</span></td>
+          <td><code style="font-size:0.75rem;">${log.endpoint}</code></td>
+          <td style="font-size:0.75rem;">${log.destination}</td>
+          <td><span class="badge ${is200 ? 'badge-permitted' : 'badge-blocked'}">${log.status_code}</span></td>
+          <td><span class="badge ${log.policy_decision === 'AUTHORIZED' ? 'badge-permitted' : 'badge-blocked'}">${log.policy_decision}</span></td>
+          <td style="font-size:0.73rem; color: var(--text-muted); max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${log.reason}">${log.reason}</td>
+          <td><span class="badge badge-neutral" style="font-size:0.65rem;">${log.source}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      console.warn("Failed to load API request logs:", e);
+    }
+  }
+
+  async probeMockApi(endpoint) {
+    try {
+      const res = await fetch(endpoint);
+      const isOk = res.ok;
+      const body = await res.json().catch(() => ({}));
+      await this.loadCompanyApiLogs();
+      const statusMsg = isOk ? `[HTTP 200 OK] Access Authorized:\n${JSON.stringify(body, null, 2)}` : `[HTTP ${res.status} FORBIDDEN] Policy Intercepted:\n${JSON.stringify(body, null, 2)}`;
+      alert(`Endpoint Probe: ${endpoint}\n\n${statusMsg}`);
+    } catch (e) {
+      alert(`Network Error probing ${endpoint}: ${e.message}`);
+    }
+  }
+
+  async loadCompanyFiles() {
+
+    try {
+      const res = await fetch("/api/demo/files");
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const docsList = document.getElementById("company-docs-list");
+      if (docsList) {
+        docsList.innerHTML = "";
+        (data.documents || []).forEach((doc) => {
+          const item = document.createElement("div");
+          item.className = "file-item";
+          item.style.padding = "4px 8px";
+          item.style.cursor = "pointer";
+          item.style.border = "1px solid #e2e8f0";
+          item.style.borderRadius = "4px";
+          item.style.fontSize = "0.75rem";
+          item.style.display = "flex";
+          item.style.justifyContent = "space-between";
+          item.innerHTML = `<span>${doc.name}</span><span class="text-muted">${doc.size_bytes}B</span>`;
+          item.addEventListener("click", () => this.inspectFile(doc.path));
+          docsList.appendChild(item);
+        });
+        const cnt = document.getElementById("approved-docs-count");
+        if (cnt) cnt.innerText = `${data.documents ? data.documents.length : 0} files`;
+      }
+
+      const restList = document.getElementById("company-restricted-list");
+      if (restList) {
+        restList.innerHTML = "";
+        (data.restricted || []).forEach((doc) => {
+          const item = document.createElement("div");
+          item.className = "file-item";
+          item.style.padding = "4px 8px";
+          item.style.cursor = "pointer";
+          item.style.border = "1px solid #fecaca";
+          item.style.background = "#fff5f5";
+          item.style.borderRadius = "4px";
+          item.style.fontSize = "0.75rem";
+          item.style.display = "flex";
+          item.style.justifyContent = "space-between";
+          item.innerHTML = `<span class="text-red font-mono">${doc.name}</span><span class="text-red" style="font-size:0.7rem;">[LOCKED]</span>`;
+          item.addEventListener("click", () => this.inspectFile(doc.path));
+          restList.appendChild(item);
+        });
+        const cnt = document.getElementById("restricted-docs-count");
+        if (cnt) cnt.innerText = `${data.restricted ? data.restricted.length : 0} files`;
+      }
+
+      const dbList = document.getElementById("company-db-list");
+      if (dbList) {
+        dbList.innerHTML = "";
+        (data.database_tables || []).forEach((tbl) => {
+          const item = document.createElement("div");
+          item.className = "file-item";
+          item.style.padding = "4px 8px";
+          item.style.border = "1px solid #e2e8f0";
+          item.style.borderRadius = "4px";
+          item.style.fontSize = "0.75rem";
+          item.style.display = "flex";
+          item.style.justifyContent = "space-between";
+          const isRest = tbl.permission === "RESTRICTED";
+          item.innerHTML = `<span class="${isRest ? 'text-red font-mono' : 'text-blue font-mono'}">table: ${tbl.name}</span><span class="badge ${isRest ? 'badge-blocked' : 'badge-permitted'}">${tbl.permission}</span>`;
+          dbList.appendChild(item);
+        });
+        (data.structured || []).forEach((csv) => {
+          const item = document.createElement("div");
+          item.className = "file-item";
+          item.style.padding = "4px 8px";
+          item.style.cursor = "pointer";
+          item.style.border = "1px solid #e2e8f0";
+          item.style.borderRadius = "4px";
+          item.style.fontSize = "0.75rem";
+          item.style.display = "flex";
+          item.style.justifyContent = "space-between";
+          item.innerHTML = `<span>${csv.name}</span><span class="text-muted">${csv.size_bytes}B</span>`;
+          item.addEventListener("click", () => this.inspectFile(csv.path));
+          dbList.appendChild(item);
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load demo files", e);
+    }
+  }
+
+  async inspectFile(path) {
+    try {
+      const res = await fetch(`/api/demo/file-content?path=${encodeURIComponent(path)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const nameEl = document.getElementById("inspector-file-name");
+        const sizeEl = document.getElementById("inspector-file-size");
+        const badgeEl = document.getElementById("inspector-badge");
+        const contentEl = document.getElementById("inspector-content");
+
+        if (nameEl) nameEl.innerText = `${data.filename} (${data.path})`;
+        if (sizeEl) sizeEl.innerText = `${data.size_bytes} bytes`;
+        if (badgeEl) {
+          badgeEl.innerText = data.classification;
+          badgeEl.className = data.classification.includes("RESTRICTED") ? "badge badge-blocked" : "badge badge-permitted";
+          badgeEl.classList.remove("hidden");
+        }
+        if (contentEl) contentEl.innerText = data.content;
+      }
+    } catch (e) {
+      console.error("Failed to inspect file", e);
+    }
+  }
+
+  async loadBlueEvents() {
+    try {
+      const res = await fetch("/api/ledger?limit=40");
+      if (res.ok) {
+        const records = await res.json();
+        const stream = document.getElementById("blue-events-stream");
+        if (stream) {
+          if (!records || records.length === 0) {
+            stream.innerHTML = '<div class="text-muted">No security events recorded in audit ledger yet.</div>';
+            return;
+          }
+          stream.innerHTML = "";
+          records.reverse().forEach((r) => {
+            const timeStr = r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : "00:00:00";
+            const details = r.details || {};
+            const isCrit = r.severity.includes("CRITICAL") || r.event_type.includes("BREACH");
+            const isDenial = r.severity.includes("HIGH") || r.event_type.includes("DENIED") || (details.pep_decision && details.pep_decision.includes("DENIED"));
+            const cat = details.attack_category || r.event_type.replace(/_/g, " ");
+            const target = details.target || details.expected_outcome || details.tool || "Company Resource";
+            const model = details.target_model || this.activeModel || "qwen2.5:3b";
+            const tool = details.tool || (details.proposed_tool ? (details.proposed_tool.tool || "tool") : "NONE");
+            const prompt = details.prompt || details.response_preview || "";
+
+            const el = document.createElement("div");
+            el.style.cssText = "margin-bottom: 8px; padding: 6px 8px; background: rgba(15,23,42,0.85); border: 1px solid #1e293b; border-radius: 4px; font-size: 0.73rem; border-left: 3px solid " + (isCrit ? "#ef4444" : (isDenial ? "#f59e0b" : "#10b981")) + ";";
+            el.innerHTML = `
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                <span style="color: #64748b; font-family: monospace;">[${timeStr}]</span>
+                <strong style="color: ${isCrit ? '#ef4444' : (isDenial ? '#38bdf8' : '#34d399')}; text-transform: uppercase;">
+                  ${cat}
+                </strong>
+                <span class="badge ${isCrit ? 'badge-blocked' : (isDenial ? 'badge-blocked' : 'badge-permitted')}" style="font-size: 0.65rem;">
+                  ${isCrit ? 'QUARANTINE_SLAUGHTER' : (isDenial ? 'PEP_DENIED' : 'PEP_AUTHORIZED')}
+                </span>
+              </div>
+              <div style="color: #cbd5e1; margin-bottom: 2px;">
+                <strong>Target:</strong> <code style="color:#38bdf8;">${target}</code> | <strong>Model:</strong> ${model}
+              </div>
+              ${prompt ? `<div style="color: #94a3b8; font-size: 0.7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><strong>Prompt:</strong> "${prompt.substring(0, 80)}..."</div>` : ''}
+              <div style="display: flex; justify-content: space-between; margin-top: 3px; font-size: 0.68rem; color: #64748b;">
+                <span>Tool: <code style="color:#f59e0b;">${tool}</code></span>
+                <span>Audit Block: <strong style="color:#38bdf8;">#${r.index}</strong></span>
+              </div>
+            `;
+            stream.appendChild(el);
+          });
+        }
+
+        // Initialize motion graph with historical events if empty
+        if (this.motionEvents.length === 0 && records && records.length > 0) {
+          records.slice(-6).forEach(r => {
+            const isCrit = r.severity && (r.severity.includes("CRITICAL") || r.severity.includes("HIGH"));
+            this.motionEvents.push({
+              id: `BLK-${r.index}`,
+              time: r.timestamp ? r.timestamp.substring(11, 19) : "00:00:00",
+              category: r.event_type || "Adversarial Probe",
+              llmReaction: isCrit ? "Exploit / Escalation Vector" : "Policy Monitored",
+              enforcement: isCrit ? "SLAUGHTER_CONTAINED" : "AUDIT_RECORDED",
+              severity: r.severity || "MEDIUM",
+              remediation: isCrit ? "Process quarantine confirmed and logged to WORM ledger." : "Zero-trust verification passed.",
+              status: isCrit ? "QUARANTINED" : "LOGGED",
+              isBreach: isCrit
+            });
+          });
+          this.renderMotionGraph();
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load blue telemetry events", e);
+    }
+  }
+
+  async resetDemoEnvironment() {
+    try {
+      const res = await fetch("/api/demo/reset", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (window.aegisDashboard) {
+          window.aegisDashboard.refreshLedgerStatus();
+        }
+        await this.loadCompanyFiles();
+        await this.loadLedgerTable();
+        alert("Demo company environment reset successfully.\n• Documents: 15 files in data/demo_company/documents/\n• Restricted: 5 files in data/demo_company/restricted/\n• Structured: 4 CSVs in data/demo_company/structured/\n• Database: company.db with customers, complaints, employees, budgets\n• Workspace: Cleared");
+      }
+    } catch (e) {
+      alert("Reset failed: " + e.message);
+    }
+  }
+
+  async clearAuditLedger() {
+    if (!confirm("Are you sure you want to reset the audit ledger to a clean initial state?")) return;
+    try {
+      const res = await fetch("/api/ledger/clear", { method: "POST" });
+      if (res.ok) {
+        await this.loadLedgerTable();
+        if (window.aegisDashboard) {
+          window.aegisDashboard.refreshLedgerStatus();
+        }
+        alert("Audit ledger reset to clean initial state.");
+      }
+    } catch (e) {
+      alert("Clear ledger failed: " + e.message);
+    }
+  }
+
+  async triggerSimulatedBreachDrill() {
+    if (!confirm("Execute Operator Simulated Breach Drill?\n\nThis explicitly tests containment slaughter on an isolated synthetic canary fixture. It does NOT grant permissions to the agent or bypass the PEP.")) return;
+    
+    try {
+      const res = await fetch("/api/simulation/breach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operator_id: "secops-operator",
+          drill_notes: "Operator containment verification drill"
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        
+        // Add to Motion Graph as simulated drill
+        this.addMotionEvent({
+          id: data.drill_id,
+          time: new Date().toLocaleTimeString(),
+          category: "SIMULATED_BREACH_DRILL",
 
 }
