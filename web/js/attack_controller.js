@@ -598,5 +598,305 @@ class AttackController {
         if (target) target.classList.add("active");
         try {
           if (btn.dataset.tab === "pane-overview") {
+            this.loadOverviewDashboard();
+          } else if (btn.dataset.tab === "pane-company") {
+            this.loadCompanyZone();
+            this.loadCompanyApiLogs();
+          } else if (btn.dataset.tab === "pane-target") {
+            this.fetchAgentStatus();
+            if (typeof loadSandboxFiles === 'function') loadSandboxFiles();
+          } else if (btn.dataset.tab === "pane-blue") {
+            this.loadBlueEvents();
+            if (typeof loadLedger === 'function') loadLedger();
+            if (typeof refreshStats === 'function') refreshStats();
+          } else if (btn.dataset.tab === "pane-ledger") {
+            this.loadLedgerTable();
+          } else if (btn.dataset.tab === "pane-red") {
+            this.fetchAgentStatus();
+            if (typeof refreshStats === 'function') refreshStats();
+          }
+        } catch (err) {
+          console.warn("Tab lazy load error:", err);
+        }
+      });
+    });
+  }
+
+  initLandingPageFlow() {
+    const landingView = document.getElementById("landing-page-view");
+    const dashboardView = document.getElementById("dashboard-view");
+    const headerTopPills = document.getElementById("header-top-pills");
+    const heroLaunchBtn = document.getElementById("btn-hero-launch-dashboard");
+    const headerBackBtn = document.getElementById("btn-header-back-landing");
+    const brandHomeBtn = document.getElementById("brand-home-link");
+
+    const showDashboard = (tabId = "pane-company") => {
+      if (landingView) landingView.style.display = "none";
+      if (dashboardView) dashboardView.style.display = "block";
+      if (headerTopPills) headerTopPills.style.display = "flex";
+      if (headerBackBtn) headerBackBtn.style.display = "inline-flex";
+      const targetTab = tabId.replace("pane-", "");
+      const tabBtn = document.getElementById(`tab-${targetTab}`);
+      if (tabBtn) tabBtn.click();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const showLanding = () => {
+      if (dashboardView) dashboardView.style.display = "none";
+      if (landingView) landingView.style.display = "block";
+      if (headerTopPills) headerTopPills.style.display = "none";
+      if (headerBackBtn) headerBackBtn.style.display = "none";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    if (heroLaunchBtn) heroLaunchBtn.addEventListener("click", () => showDashboard("pane-company"));
+    if (headerBackBtn) headerBackBtn.addEventListener("click", () => showLanding());
+    if (brandHomeBtn) {
+      brandHomeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        showLanding();
+      });
+    }
+
+    // Scroll-triggered reveal motion observer for landing page chapters
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+          }
+        });
+      }, { threshold: 0.12 });
+
+      document.querySelectorAll(".motion-reveal").forEach((el) => observer.observe(el));
+    } else {
+      document.querySelectorAll(".motion-reveal").forEach((el) => el.classList.add("is-visible"));
+    }
+  }
+
+
+  async fetchAgentStatus() {
+    try {
+      const res = await fetch("/api/agent/status");
+      if (!res.ok) return;
+      const data = await res.json();
+
+      const modelEl = document.getElementById("target-view-model");
+      if (modelEl) modelEl.innerText = data.target_model || "qwen2.5:3b";
+
+      const ctrlEl = document.getElementById("target-controller-mode");
+      if (ctrlEl) ctrlEl.innerText = `${data.status} (${data.assistant_mode === 'company' ? 'Company Mode' : 'General Mode'})`;
+
+      const wsPathEl = document.getElementById("target-workspace-path");
+      if (wsPathEl) wsPathEl.innerText = data.workspace_path || "data/demo_company/workspace/";
+
+      const slaEl = document.getElementById("target-sla-target");
+      if (slaEl) slaEl.innerText = `< ${data.quarantine_sla_target_ms || 50} ms`;
+
+      if (data.tool_permissions && Array.isArray(data.tool_permissions)) {
+        const tbody = document.getElementById("target-tools-table-body");
+        if (tbody) {
+          tbody.innerHTML = "";
+          data.tool_permissions.forEach((t) => {
+            const tr = document.createElement("tr");
+            const compBadge = t.company_allowed
+              ? `<span class="badge badge-permitted">PERMITTED</span>`
+              : `<span class="badge badge-blocked">DISABLED</span>`;
+            const genBadge = t.general_allowed
+              ? `<span class="badge badge-permitted">PERMITTED</span>`
+              : `<span class="badge badge-blocked">DISABLED</span>`;
+            tr.innerHTML = `
+              <td><code>${t.tool}</code></td>
+              <td>${t.purpose}</td>
+              <td>${compBadge}</td>
+              <td>${genBadge}</td>
+              <td>${t.rule}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch agent status:", e);
+    }
+  }
+
+  async loadOverviewDashboard() {
+    try {
+      // 1. Hardware info
+      const hwRes = await fetch("/api/system/hardware");
+      if (hwRes.ok) {
+        const hw = await hwRes.json();
+        const topHw = document.getElementById("top-hardware-badge");
+        const ovHw = document.getElementById("overview-hardware");
+        const hwText = `${hw.platform || 'Windows'} | ${hw.gpu_name || hw.gpu || 'DirectML / Integrated'} | ${hw.ram_gb || hw.total_memory_gb || '--'}GB RAM`;
+        if (topHw) topHw.innerText = hwText;
+        if (ovHw) ovHw.innerText = hwText;
+      }
+
+      // 2. Agent status
+      const agRes = await fetch("/api/agent/status");
+      if (agRes.ok) {
+        const ag = await agRes.json();
+        const ovModel = document.getElementById("overview-active-model");
+        if (ovModel) ovModel.innerText = `${ag.target_model || ag.model || 'qwen2.5:3b'} (${ag.provider || 'Ollama'})`;
+      }
+
+      // 3. Update summary metrics in overview
+      const ovAtt = document.getElementById("ov-count-attempted");
+      if (ovAtt) ovAtt.innerText = this.testMetrics.attempted;
+      const ovRef = document.getElementById("ov-count-refusals");
+      if (ovRef) ovRef.innerText = this.testMetrics.modelRefusals;
+      const ovPep = document.getElementById("ov-count-pep");
+      if (ovPep) ovPep.innerText = this.testMetrics.pepDenials;
+      const ovBre = document.getElementById("ov-count-breaches");
+      if (ovBre) ovBre.innerText = this.testMetrics.confirmedBreaches;
+      const ovDef = document.getElementById("ov-defense-rate");
+      const ovDefNote = document.getElementById("ov-defense-note");
+      const denom = this.testMetrics.pepDenials + this.testMetrics.confirmedBreaches;
+      if (ovDef) {
+        if (denom === 0) {
+          ovDef.innerText = "NOT AVAILABLE";
+          if (ovDefNote) ovDefNote.innerText = "Awaiting live tests";
+        } else {
+          const rate = Math.round((this.testMetrics.pepDenials / denom) * 100);
+          ovDef.innerText = `${rate}%`;
+          if (ovDefNote) ovDefNote.innerText = `${this.testMetrics.pepDenials} / ${denom} evaluated checks`;
+        }
+      }
+
+      // 4. Ledger records for recent executions
+      const ledRes = await fetch("/api/ledger?limit=10");
+      if (ledRes.ok) {
+        const records = await ledRes.json();
+        const tbody = document.getElementById("overview-recent-tests-tbody");
+        if (tbody && records && records.length > 0) {
+          tbody.innerHTML = "";
+          records.forEach((r) => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td class="font-mono text-blue">${r.session_id ? r.session_id.substring(0, 16) + '...' : '--'}</td>
+              <td>${r.timestamp ? new Date(r.timestamp).toLocaleTimeString() : '--'}</td>
+              <td>${r.event_type}</td>
+              <td><span class="badge badge-neutral">${r.source_zone}</span></td>
+              <td><span class="badge ${r.severity.includes('CRITICAL') || r.severity.includes('HIGH') ? 'badge-blocked' : 'badge-permitted'}">${r.severity}</span></td>
+              <td><strong>Block #${r.index}</strong></td>
+              <td class="font-mono text-cyan" title="${r.current_hash}">${r.current_hash ? r.current_hash.substring(0, 14) + '...' : '--'}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load overview dashboard:", e);
+    }
+  }
+
+  async loadCompanyZone() {
+    try {
+      const res = await fetch("/api/company/overview-profile");
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Documents
+      const pubContainer = document.getElementById("company-docs-public");
+      const intContainer = document.getElementById("company-docs-internal");
+      const restContainer = document.getElementById("company-docs-restricted");
+
+      if (pubContainer && data.documents && data.documents.public) {
+        pubContainer.innerHTML = "";
+        data.documents.public.forEach((doc) => {
+          const el = document.createElement("div");
+          el.className = "file-item";
+          el.style.cssText = "padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;";
+          el.innerHTML = `<span class="text-blue font-mono">${doc.name}</span><span class="text-muted">${doc.size_formatted}</span>`;
+          el.addEventListener("click", () => this.inspectCompanyFile(`documents/${doc.name}`, doc.name, doc.classification, doc.size_formatted));
+          pubContainer.appendChild(el);
+        });
+        const pubCnt = document.getElementById("doc-count-public");
+        if (pubCnt) pubCnt.innerText = `${data.documents.public.length} files`;
+      }
+
+      if (intContainer && data.documents && data.documents.internal) {
+        intContainer.innerHTML = "";
+        data.documents.internal.forEach((doc) => {
+          const el = document.createElement("div");
+          el.className = "file-item";
+          el.style.cssText = "padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;";
+          el.innerHTML = `<span class="text-main font-mono">${doc.name}</span><span class="text-muted">${doc.size_formatted}</span>`;
+          el.addEventListener("click", () => this.inspectCompanyFile(`documents/${doc.name}`, doc.name, doc.classification, doc.size_formatted));
+          intContainer.appendChild(el);
+        });
+        const intCnt = document.getElementById("doc-count-internal");
+        if (intCnt) intCnt.innerText = `${data.documents.internal.length} files`;
+      }
+
+      if (restContainer && data.documents && data.documents.restricted) {
+        restContainer.innerHTML = "";
+        data.documents.restricted.forEach((doc) => {
+          const el = document.createElement("div");
+          el.className = "file-item";
+          el.style.cssText = "padding: 4px 8px; border: 1px solid #fecaca; background: #fff5f5; border-radius: 4px; font-size: 0.75rem; display: flex; justify-content: space-between; cursor: pointer;";
+          el.innerHTML = `<span class="text-red font-mono">${doc.name}</span><span class="badge badge-blocked">${doc.permission}</span>`;
+          el.addEventListener("click", () => this.inspectCompanyFile(`restricted/${doc.name}`, doc.name, doc.classification, doc.size_formatted));
+          restContainer.appendChild(el);
+        });
+        const restCnt = document.getElementById("doc-count-restricted");
+        if (restCnt) restCnt.innerText = `${data.documents.restricted.length} files`;
+      }
+
+      // SQLite Database Tables
+      const dbTbody = document.getElementById("company-db-tables-tbody");
+      if (dbTbody && data.database && data.database.tables) {
+        dbTbody.innerHTML = "";
+        data.database.tables.forEach((t) => {
+          const tr = document.createElement("tr");
+          const isRest = t.permission === "RESTRICTED";
+          tr.innerHTML = `
+            <td><code>${t.name}</code></td>
+            <td>${t.classification}</td>
+            <td><span class="badge ${isRest ? 'badge-blocked' : 'badge-permitted'}">${t.permission}</span></td>
+            <td><strong class="${isRest ? 'text-red' : 'text-blue'}">${t.record_count} rows</strong></td>
+          `;
+          dbTbody.appendChild(tr);
+        });
+      }
+
+      // Structured Datasets
+      const dataTbody = document.getElementById("company-datasets-tbody");
+      if (dataTbody && data.structured_datasets) {
+        dataTbody.innerHTML = "";
+        data.structured_datasets.forEach((ds) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><code>${ds.filename}</code></td>
+            <td>${ds.records} rows</td>
+            <td><span class="badge ${ds.classification.includes('Tier 1') ? 'badge-blocked' : 'badge-permitted'}">${ds.classification}</span></td>
+            <td class="font-mono" style="font-size:0.7rem;">${ds.columns.join(', ')}</td>
+          `;
+          dataTbody.appendChild(tr);
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load company zone data:", e);
+    }
+  }
+
+  async inspectCompanyFile(relPath, filename, classification, sizeFormatted) {
+    try {
+      const res = await fetch(`/api/demo/file-content?path=${encodeURIComponent(relPath)}`);
+      const nameEl = document.getElementById("company-inspector-name");
+      const sizeEl = document.getElementById("company-inspector-size");
+      const badgeEl = document.getElementById("company-inspector-badge");
+      const contentEl = document.getElementById("company-inspector-content");
+
+      if (res.ok) {
+        const data = await res.json();
+        if (nameEl) nameEl.innerText = `${data.filename || filename} (${data.path || relPath})`;
+        if (sizeEl) sizeEl.innerText = `${data.size_bytes} bytes`;
+        if (badgeEl) {
+          badgeEl.innerText = data.classification || classification;
+          badgeEl.className = (data.classification || classification).includes("RESTRICTED") ? "badge badge-blocked" : "badge badge-permitted";
+          badgeEl.classList.remove("hidden");
 
 }
