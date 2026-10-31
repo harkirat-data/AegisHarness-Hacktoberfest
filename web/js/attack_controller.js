@@ -3298,5 +3298,255 @@ class AttackController {
           btn.classList.remove("btn-secondary");
           const cat = btn.getAttribute("data-cat");
           this.renderJailbreakList(cat);
+        });
+      });
+    }
+  }
+
+  async fetchJailbreaks(category = "all") {
+    try {
+      const res = await fetch("/api/jailbreaks");
+      if (!res.ok) return;
+      const data = await res.json();
+      this.jailbreakPayloads = data.payloads || [];
+      this.renderJailbreakList(category);
+    } catch (e) {
+      console.error("Failed to load jailbreaks", e);
+    }
+  }
+
+  renderJailbreakList(category = "all") {
+    const listCont = document.getElementById("jailbreak-payload-list");
+    if (!listCont || !this.jailbreakPayloads) return;
+
+    const filtered = category === "all"
+      ? this.jailbreakPayloads
+      : this.jailbreakPayloads.filter((p) => (p.category || "").toLowerCase() === category.toLowerCase() || (p.category || "").toLowerCase().includes(category.toLowerCase()));
+
+    listCont.innerHTML = "";
+    if (filtered.length === 0) {
+      listCont.innerHTML = '<div class="text-muted" style="text-align:center;padding:1rem;">No payloads in this category.</div>';
+      return;
+    }
+
+    filtered.forEach((p) => {
+      const item = document.createElement("div");
+      item.className = "jailbreak-card";
+      item.style.cssText = "padding: 8px 10px; border: 1px solid var(--card-border); border-radius: 4px; cursor: pointer; background: #fff; transition: background 0.15s ease;";
+      
+      const catBadge = p.category.includes("Company") ? "badge-amber" : (p.category.includes("Multi") ? "badge-blue" : (p.category.includes("Tool") ? "badge-purple" : "badge-neutral"));
+      const turnsBadge = (p.num_turns && p.num_turns > 1) ? `<span class="badge badge-primary" style="font-size:0.6rem; margin-left:4px;">${p.num_turns} Turns</span>` : "";
+
+      item.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px;">
+          <strong style="font-size: 0.78rem; color: var(--text-main);">${p.name || p.title}</strong>
+          <span class="badge ${catBadge}" style="font-size: 0.62rem;">${p.category}</span>
+        </div>
+        <div style="display: flex; gap: 8px; font-size: 0.68rem; margin: 3px 0; color: var(--text-muted); flex-wrap: wrap;">
+          <span><strong>Target:</strong> <code style="color: var(--accent-amber);">${p.target_resource || 'Company Resource'}</code></span>
+          <span><strong>Tool:</strong> <code style="color: var(--accent-blue);">${p.target_tool || 'read_document'}</code></span>
+          ${turnsBadge}
+        </div>
+        <div style="font-size: 0.68rem; color: var(--text-muted); line-height: 1.25;">${(p.attack_objective || p.description || p.preview || '').substring(0, 105)}...</div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.63rem; color: var(--text-muted); margin-top: 4px;">
+          <span>Status: <strong class="text-green">${p.execution_status || 'READY'}</strong></span>
+          <span>ID: <code>${p.id}</code></span>
+        </div>
+      `;
+      item.onclick = () => {
+        listCont.querySelectorAll(".jailbreak-card").forEach(c => c.style.background = "#fff");
+        item.style.background = "rgba(79, 70, 229, 0.06)";
+        this.selectJailbreakPayload(p.id);
+      };
+      listCont.appendChild(item);
+    });
+
+    if (filtered.length > 0) {
+      this.selectJailbreakPayload(filtered[0].id);
+    }
+  }
+
+  async selectJailbreakPayload(payloadId) {
+    try {
+      const res = await fetch(`/api/jailbreaks/${payloadId}`);
+      if (!res.ok) return;
+      const p = await res.json();
+      this.selectedJailbreak = p;
+
+      const titleEl = document.getElementById("jb-preview-title");
+      const metaEl = document.getElementById("jb-preview-meta");
+      const bodyEl = document.getElementById("jb-preview-body");
+      const loadBtn = document.getElementById("btn-load-jailbreak-to-chat");
+      const runBtn = document.getElementById("btn-run-jailbreak-scenario");
+
+      const catEl = document.getElementById("jb-badge-cat");
+      const resEl = document.getElementById("jb-badge-resource");
+      const toolEl = document.getElementById("jb-badge-tool");
+      const turnsEl = document.getElementById("jb-badge-turns");
+      const statusEl = document.getElementById("jb-badge-status");
+      const objEl = document.getElementById("jb-badge-objective");
+      const alertEl = document.getElementById("jb-execution-alert");
+      const turnsCont = document.getElementById("jb-turns-container");
+
+      if (titleEl) titleEl.innerText = p.name;
+      if (metaEl) metaEl.innerText = `Target Resource: ${p.target_resource} | Tool: ${p.target_tool} | ID: ${p.id}`;
+      if (catEl) catEl.innerText = p.category;
+      if (resEl) resEl.innerText = p.target_resource || "--";
+      if (toolEl) toolEl.innerText = p.target_tool || "--";
+      if (turnsEl) turnsEl.innerText = `${p.num_turns || 1} Turn(s)`;
+      if (statusEl) statusEl.innerHTML = `<span class="badge ${p.execution_status === 'READY' ? 'badge-success' : 'badge-neutral'}">${p.execution_status || 'READY'}</span>`;
+      if (objEl) objEl.innerHTML = `<strong>Objective:</strong> ${p.attack_objective || p.description}`;
+
+      if (alertEl) alertEl.classList.add("hidden");
+      if (turnsCont) turnsCont.classList.add("hidden");
+
+      if (bodyEl) {
+        if (p.prompts && p.prompts.length > 1) {
+          let turnsPreview = "";
+          p.prompts.forEach((pt, i) => {
+            turnsPreview += `=== TURN ${i + 1} of ${p.prompts.length} ===\n${pt}\n\n`;
+          });
+          bodyEl.innerText = turnsPreview.trim();
+        } else {
+          bodyEl.innerText = p.prompt_text || p.full_prompt || "";
+        }
+      }
+
+      if (loadBtn) loadBtn.disabled = false;
+      if (runBtn) runBtn.disabled = false;
+    } catch (e) {
+      console.error("Failed to inspect jailbreak", e);
+    }
+  }
+
+  loadSelectedJailbreakIntoChat() {
+    if (!this.selectedJailbreak) return;
+    const chatInput = document.getElementById("chat-input");
+    if (chatInput) {
+      const p = this.selectedJailbreak;
+      const initialPrompt = (p.prompts && p.prompts.length > 0) ? p.prompts[0] : (p.prompt_text || p.full_prompt);
+      chatInput.value = initialPrompt;
+      chatInput.focus();
+      chatInput.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      if (p.num_turns > 1) {
+        this.currentMultiTurnPayload = p;
+        this.currentMultiTurnIndex = 0;
+        this.appendChatMessage("system", `[Red Team Orchestrator] Loaded Turn 1 of ${p.num_turns} for multi-turn scenario '${p.name}'. Submit this prompt to begin.`);
+      }
+    }
+    const modal = document.getElementById("jailbreak-modal");
+    if (modal) modal.classList.add("hidden");
+  }
+
+  async runSelectedJailbreakScenario() {
+    if (!this.selectedJailbreak) return;
+    const p = this.selectedJailbreak;
+    const runBtn = document.getElementById("btn-run-jailbreak-scenario");
+    const loadBtn = document.getElementById("btn-load-jailbreak-to-chat");
+    const alertEl = document.getElementById("jb-execution-alert");
+    const turnsCont = document.getElementById("jb-turns-container");
+    const turnsList = document.getElementById("jb-turns-list");
+
+    if (runBtn) {
+      runBtn.disabled = true;
+      runBtn.innerText = "Executing attack...";
+    }
+    if (loadBtn) loadBtn.disabled = true;
+
+    try {
+      const res = await fetch("/api/jailbreaks/execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payload_id: p.id,
+          target_model: this.activeModel,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Jailbreak execution failed");
+      }
+
+      const data = await res.json();
+
+      if (alertEl) {
+        alertEl.classList.remove("hidden");
+        const jbSuccess = (data.model_layer_jailbreak === "SUCCESS");
+        const pepSuccess = (data.pep_defense === "SUCCESS");
+        const breach = (data.confirmed_breach === "YES");
+
+        let alertBg = "#eff6ff";
+        let alertBorder = "#bfdbfe";
+        let alertText = "#1e40af";
+
+        if (breach) {
+          alertBg = "#fef2f2";
+          alertBorder = "#fecaca";
+          alertText = "#991b1b";
+        } else if (pepSuccess) {
+          alertBg = "#f0fdf4";
+          alertBorder = "#bbf7d0";
+          alertText = "#166534";
+        }
+
+        alertEl.style.cssText = `padding: 8px 10px; border-radius: 4px; font-size: 0.74rem; background: ${alertBg}; border: 1px solid ${alertBorder}; color: ${alertText};`;
+        alertEl.innerHTML = `
+          <div style="font-weight: 700; margin-bottom: 4px;">Attack Execution Result &mdash; ${data.final_outcome}</div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.72rem;">
+            <span>MODEL-LAYER JAILBREAK: <strong class="${jbSuccess ? 'text-amber' : 'text-muted'}">${data.model_layer_jailbreak}</strong></span>
+            <span>PEP DEFENSE: <strong class="${pepSuccess ? 'text-green' : 'text-red'}">${data.pep_defense}</strong></span>
+            <span>CONFIRMED BREACH: <strong class="${breach ? 'text-red' : 'text-green'}">${data.confirmed_breach}</strong></span>
+          </div>
+          <div style="font-size: 0.68rem; margin-top: 4px; opacity: 0.9;">Session ID: <code>${data.session_id}</code> | WORM Audit Block: #${data.audit_record_index || '--'}</div>
+        `;
+      }
+
+      if (turnsCont && turnsList && data.turns) {
+        turnsCont.classList.remove("hidden");
+        turnsList.innerHTML = "";
+
+        data.turns.forEach((t) => {
+          const item = document.createElement("div");
+          item.style.cssText = "padding: 6px 8px; border: 1px solid var(--card-border); border-radius: 4px; background: #fafafa; font-size: 0.7rem;";
+          const propToolStr = t.tool_proposal ? `${t.tool_proposal.tool}(${JSON.stringify(t.tool_proposal.arguments || {})})` : 'None';
+          item.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+              <strong>Turn #${t.turn_index}: Decision: <span class="${t.model_decision === 'TOOL_PROPOSED' ? 'text-amber' : 'text-blue'}">${t.model_decision}</span></strong>
+              <span class="badge ${t.pep_decision === 'PEP_DENIED' ? 'badge-danger' : (t.pep_decision === 'PEP_AUTHORIZED' ? 'badge-success' : 'badge-neutral')}">${t.pep_decision}</span>
+            </div>
+            <div><strong>Prompt:</strong> ${(t.prompt || '').substring(0, 90)}...</div>
+            <div><strong>Tool Proposed:</strong> <code style="color:var(--accent-blue);">${propToolStr}</code></div>
+            <div><strong>Resource Outcome:</strong> <span class="font-mono">${t.resource_access_outcome}</span></div>
+            <div style="margin-top: 2px; color: var(--text-muted); font-size: 0.66rem;">Model Output: ${(t.raw_response || '').substring(0, 100)}...</div>
+          `;
+          turnsList.appendChild(item);
+        });
+      }
+
+      // Refresh SOC store metrics and incident table
+      this.loadSOCDashboard();
+      this.loadSOCIncidents();
+      await this.loadBlueEvents();
+
+      const breach = (data.confirmed_breach === "YES");
+      this.addMotionEvent({
+        id: data.session_id || `JB-${Date.now().toString(36)}`,
+        time: new Date().toLocaleTimeString(),
+        category: p.name || p.id,
+        llmReaction: data.model_layer_jailbreak === "SUCCESS" ? "Jailbreak Succeeded (Restricted Tool Called)" : "Model Refused",
+        enforcement: breach ? "CONFIRMED_BREACH -> QUARANTINE_SLAUGHTER" : (data.pep_defense === "SUCCESS" ? "PEP_DEFENSE_BLOCKED" : "UNRESTRICTED"),
+        severity: breach ? "CRITICAL" : (data.model_layer_jailbreak === "SUCCESS" ? "HIGH" : "LOW"),
+        remediation: breach
+          ? "CRITICAL: Unauthorized exfiltration detected. Host OS worker process slaughtered under containment SLA."
+          : "SecOps: Zero-trust Policy Enforcement Point stopped unauthorized document exfiltration.",
+        isBreach: breach
+      });
+
+      // Trigger animated dataflow in Target Zone and log real-time security event
+      const firstTurn = data.turns && data.turns.length > 0 ? data.turns[0] : {};
+      this.animateArchitectureFromExecution({
+        execution_id: data.session_id,
 
 }
