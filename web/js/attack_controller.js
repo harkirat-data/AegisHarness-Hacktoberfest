@@ -3548,5 +3548,205 @@ class AttackController {
       const firstTurn = data.turns && data.turns.length > 0 ? data.turns[0] : {};
       this.animateArchitectureFromExecution({
         execution_id: data.session_id,
+        tool_invocation: firstTurn.tool_proposal ? `${firstTurn.tool_proposal.tool}(...)` : "NONE",
+        pep_decision: data.pep_defense === "SUCCESS" ? "DENIED" : (firstTurn.pep_decision || "AUTHORIZED"),
+        resource_access_outcome: firstTurn.resource_access_outcome || "ACCESS_DENIED",
+        quarantined: data.confirmed_breach === "YES",
+        runtime_containment: data.confirmed_breach === "YES" ? "CONTAINER_SLAUGHTERED" : "MONITORED",
+        latency_ms: 25.0
+      });
+
+      this.logBlueSecurityEvent({
+        category: p.name || p.id || "Jailbreak Exploit",
+        prompt: (p.prompt || (firstTurn.prompt || '')),
+        model: this.activeModel,
+        tool: firstTurn.tool_proposal ? `${firstTurn.tool_proposal.tool}(...)` : 'NONE',
+        target: p.target_resource || "restricted_file",
+        pepDecision: data.pep_defense === "SUCCESS" ? "PEP_DENIED" : "PEP_AUTHORIZED",
+        status: data.confirmed_breach === "YES" ? "BREACH" : (data.pep_defense === "SUCCESS" ? "DENIED" : "AUTHORIZED"),
+        auditBlock: data.audit_record_index || "--",
+        isBreach: data.confirmed_breach === "YES"
+      });
+    } catch (e) {
+      console.error("Jailbreak execution error", e);
+      if (alertEl) {
+        alertEl.classList.remove("hidden");
+        alertEl.style.cssText = "padding: 8px 10px; border-radius: 4px; font-size: 0.74rem; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;";
+        alertEl.innerHTML = `<strong>Execution Error:</strong> ${e.message}`;
+      }
+    } finally {
+      if (runBtn) {
+        runBtn.disabled = false;
+        runBtn.innerText = "Run Attack Scenario";
+      }
+      if (loadBtn) loadBtn.disabled = false;
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 4 — TARGET ZONE ARCHITECTURE VISUALIZER
+  // =========================================================================
+  animateArchitectureStage(stage, outcome = null) {
+    const nodes = [
+      "arch-node-red", "arch-node-controller", "arch-node-ollama", "arch-node-inference",
+      "arch-node-parser", "arch-node-dispatcher", "arch-node-pep", "arch-node-resources",
+      "arch-node-sandbox", "arch-node-telemetry", "arch-node-blue", "arch-node-ledger"
+    ];
+
+    const edges = [
+      "edge-red-agent", "edge-agent-ollama", "edge-ollama-inference", "edge-inference-parser",
+      "edge-parser-dispatcher", "edge-dispatcher-pep", "edge-pep-resources", "edge-resources-sandbox",
+      "edge-sandbox-telemetry", "edge-telemetry-blue", "edge-blue-ledger"
+    ];
+
+    if (stage === "INGRESS") {
+      this.setNodeState("arch-node-red", "state-blue", "node-status-red", "ACTIVE");
+      this.setEdgeActive("edge-red-agent");
+      this.setNodeState("arch-node-controller", "state-blue", "node-status-controller", "ROUTING");
+    } else if (stage === "INFERENCE") {
+      this.setEdgeActive("edge-agent-ollama");
+      this.setEdgeActive("edge-ollama-inference");
+      this.setNodeState("arch-node-ollama", "state-blue", "node-status-ollama", "INFERRING");
+      this.setNodeState("arch-node-inference", "state-blue", "node-status-inference", "RUNNING");
+    } else if (stage === "PARSER") {
+      this.setEdgeActive("edge-inference-parser");
+      this.setEdgeActive("edge-parser-dispatcher");
+      this.setNodeState("arch-node-parser", "state-blue", "node-status-parser", "PARSED");
+      this.setNodeState("arch-node-dispatcher", "state-blue", "node-status-dispatcher", "DISPATCHED");
+    } else if (stage === "PEP") {
+      this.setEdgeActive("edge-dispatcher-pep");
+      if (outcome === "DENIED") {
+        this.setNodeState("arch-node-pep", "state-red", "node-status-pep", "DENIED");
+      } else if (outcome === "AUTHORIZED") {
+        this.setNodeState("arch-node-pep", "state-green", "node-status-pep", "AUTHORIZED");
+      }
+    } else if (stage === "RESOURCE") {
+      this.setEdgeActive("edge-pep-resources");
+      if (outcome === "DENIED" || outcome === "BLOCKED") {
+        this.setNodeState("arch-node-resources", "state-red", "node-status-resources", "BLOCKED");
+      } else {
+        this.setNodeState("arch-node-resources", "state-green", "node-status-resources", "ACCESSED");
+      }
+    } else if (stage === "CONTAINMENT") {
+      this.setEdgeActive("edge-resources-sandbox");
+      this.setNodeState("arch-node-sandbox", "state-purple", "node-status-sandbox", "QUARANTINED");
+      this.setEdgeActive("edge-sandbox-telemetry");
+      this.setEdgeActive("edge-telemetry-blue");
+      this.setNodeState("arch-node-telemetry", "state-blue", "node-status-telemetry", "TELEMETRY");
+      this.setNodeState("arch-node-blue", "state-blue", "node-status-blue", "ALERTED");
+    } else if (stage === "AUDIT") {
+      this.setEdgeActive("edge-blue-ledger");
+      this.setNodeState("arch-node-ledger", "state-green", "node-status-ledger", "COMMITTED");
+    } else if (stage === "RESET") {
+      nodes.forEach((n) => {
+        const el = document.getElementById(n);
+        if (el) el.className = "arch-node state-neutral";
+      });
+      edges.forEach((e) => {
+        const el = document.getElementById(e);
+        if (el) el.classList.remove("edge-active");
+      });
+    }
+  }
+
+  setNodeState(nodeId, stateClass, pillId, text) {
+    const el = document.getElementById(nodeId);
+    if (el) el.className = `arch-node ${stateClass}`;
+    const pill = document.getElementById(pillId);
+    if (pill) {
+      pill.innerText = text;
+      pill.className = `badge arch-node-pill ${stateClass === 'state-red' ? 'badge-blocked' : (stateClass === 'state-green' ? 'badge-permitted' : 'badge-blue')}`;
+    }
+  }
+
+  setEdgeActive(edgeId) {
+    const el = document.getElementById(edgeId);
+    if (el) el.classList.add("edge-active");
+  }
+
+  animateArchitectureFromExecution(data) {
+    const statusBadge = document.getElementById("arch-pipeline-status");
+    if (statusBadge) {
+      statusBadge.innerText = "ATTACK SIGNAL PROPAGATING...";
+      statusBadge.className = "badge badge-blocked";
+    }
+
+    this.animateArchitectureStage("INGRESS");
+    setTimeout(() => this.animateArchitectureStage("INFERENCE"), 300);
+    setTimeout(() => {
+      if (data.tool_invocation && data.tool_invocation !== "NOT EXECUTED" && data.tool_invocation !== "NO_TOOL_PROPOSED") {
+        this.animateArchitectureStage("PARSER");
+      }
+    }, 650);
+    setTimeout(() => {
+      const pepDec = data.pep_decision || "NOT EXECUTED";
+      const isDenied = pepDec.includes("DENIED") || pepDec.includes("BLOCKED");
+      if (pepDec !== "NOT EXECUTED") {
+        this.animateArchitectureStage("PEP", isDenied ? "DENIED" : "AUTHORIZED");
+        this.animateArchitectureStage("RESOURCE", (data.resource_access_outcome === "ACCESS_DENIED" || isDenied) ? "DENIED" : "PERMITTED");
+      }
+    }, 1050);
+    setTimeout(() => {
+      if (data.quarantined || (data.runtime_containment && data.runtime_containment.includes("SLAUGHTERED"))) {
+        this.animateArchitectureStage("CONTAINMENT");
+      }
+      this.animateArchitectureStage("AUDIT");
+      if (statusBadge) {
+        const pd = data.pep_decision || "DEFENDED";
+        statusBadge.innerText = `FLOW: INGRESS -> MODEL -> PEP (${pd}) -> AUDIT COMMITTED`;
+        statusBadge.className = pd.includes("DENIED") ? "badge badge-blocked" : "badge badge-permitted";
+      }
+    }, 1450);
+
+    // Update Live Target Card
+    const execIdEl = document.getElementById("target-live-exec-id");
+    const latEl = document.getElementById("target-live-latency");
+    const propEl = document.getElementById("target-live-proposal");
+    const pepEl = document.getElementById("target-live-pep");
+
+    if (execIdEl) execIdEl.innerText = data.execution_id || "--";
+    if (latEl) latEl.innerText = data.latency_ms ? `${data.latency_ms.toFixed(1)} ms` : "--";
+    if (propEl) propEl.innerText = data.tool_invocation || (data.tool_proposal ? (data.tool_proposal.tool || JSON.stringify(data.tool_proposal)) : "NONE");
+    if (pepEl) {
+      const pd = data.pep_decision || "NOT EXECUTED";
+      pepEl.innerText = pd;
+      pepEl.className = `metric-tile-val ${pd.includes('DENIED') ? 'text-red' : (pd.includes('AUTHORIZED') ? 'text-emerald' : 'text-muted')}`;
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 5 — BLUE ZONE SOC DASHBOARD & INCIDENT MANAGEMENT
+  // =========================================================================
+  async loadSOCDashboard() {
+    try {
+      const res = await fetch("/api/soc/overview");
+      if (!res.ok) return;
+      const m = await res.json();
+
+      const map = {
+        "soc-m-campaigns": m.total_campaigns,
+        "soc-m-attacks": m.total_attacks_executed,
+        "soc-m-jailbreaks": m.successful_jailbreaks,
+        "soc-m-refusals": m.model_refusals,
+        "soc-m-proposals": m.suspicious_tool_proposals,
+        "soc-m-pep-denials": m.pep_denials,
+        "soc-m-authorized": m.authorized_operations,
+        "soc-m-res-violations": m.resource_access_violations,
+        "soc-m-runtime-blocks": m.runtime_blocks,
+        "soc-m-breaches": m.confirmed_breaches,
+        "soc-m-quarantines": m.quarantine_events,
+        "soc-m-containments": m.successful_containments,
+      };
+
+      for (const [id, val] of Object.entries(map)) {
+        const el = document.getElementById(id);
+        if (el) el.innerText = val != null ? val : 0;
+      }
+    } catch (e) {
+      console.error("Failed to load SOC overview", e);
+    }
+  }
+
+  async loadSOCAnalytics() {
 
 }
