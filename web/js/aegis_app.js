@@ -948,5 +948,105 @@ function createNewSandbox() {
   const log = document.getElementById('chat-log');
   if (log) {
     log.innerHTML = `
+      <div class="chat-welcome">
+        <div class="welcome-icon"><span class="badge badge-neutral" style="font-size:0.8rem;letter-spacing:1px;font-weight:600;">SANDBOX ACTIVE</span></div>
+        <div class="welcome-title">New Disposable Sandbox Provisioned</div>
+        <div class="welcome-sub">Workload is active and monitored under zero-trust isolation. Ready for testing.</div>
+      </div>
+    `;
+  }
+  const execLog = document.getElementById('exec-log');
+  if (execLog) {
+    execLog.innerHTML = `<div class="exec-empty">Security execution events will appear here when you send a message.</div>`;
+  }
+  const toolSum = document.getElementById('tool-summary');
+  if (toolSum) toolSum.classList.add('hidden');
+
+  dismissQuarantine();
+  updateSandboxStateChips('ACTIVE');
+
+  // Pre-fill Blue Team manual quarantine session
+  const qInput = document.getElementById('quarantine-session');
+  if (qInput) qInput.value = state.sessionId;
+
+  // Proactively provision sandbox on backend
+  fetch('/api/sandbox/provision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: state.sessionId }),
+  }).catch(() => {});
+
+  // Update audit ledger
+  if (typeof loadLedger === 'function') loadLedger();
+  if (window.attackController && typeof window.attackController.loadLedgerTable === 'function') {
+    window.attackController.loadLedgerTable();
+  }
+
+  if (input) input.focus();
+}
+
+// ===== STATE CHIPS =====
+function updateSandboxStateChips(stateText) {
+  const cls = {
+    'IDLE': 'state-idle',
+    'ACTIVE': 'state-ready',
+    'EXECUTING': 'state-executing',
+    'THREAT_DETECTED': 'state-threat',
+    'QUARANTINED': 'state-quarantined',
+    'READY': 'state-ready',
+  }[stateText] || 'state-idle';
+
+  ['sandbox-state-chip', 'stat-sandbox-state', 'sandbox-state-detail'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = el.className
+      .replace(/\bstate-\w+\b/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (el.classList.contains('state-chip')) {
+      el.classList.add(cls);
+      el.textContent = stateText;
+    } else {
+      el.className += ` state-chip ${cls}`;
+      el.textContent = stateText;
+    }
+  });
+}
+
+// ===== STATS BAR =====
+async function refreshStats() {
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    state.stats.ledgerBlocks = data.total_ledger_records;
+    state.stats.integrity = data.ledger_integrity_valid;
+
+    setElText('stat-ledger', data.total_ledger_records);
+    const elIntegrity = document.getElementById('stat-integrity');
+    if (elIntegrity) {
+      elIntegrity.textContent = data.ledger_integrity_valid ? 'Valid' : 'Broken';
+      elIntegrity.style.color = data.ledger_integrity_valid ? 'var(--green)' : 'var(--red)';
+    }
+  } catch { /* non-critical */ }
+
+  setElText('stat-total', state.stats.total);
+  setElText('stat-threats', state.stats.threats);
+  setElText('stat-blocked', state.stats.blocked);
+  setElText('stat-permitted', state.stats.permitted);
+
+  if (state.allEvents && state.allEvents.length) {
+    aggregateSocMetrics(state.allEvents);
+  }
+}
+
+// ===== MODEL STATUS =====
+async function updateModelChip() {
+  const chip = document.getElementById('model-status-chip');
+  if (!chip) return;
+  const label = document.getElementById('model-chip-label');
+  const dot = chip.querySelector('.dot');
+
+  try {
+    const res = await fetch('/api/agent/status');
 
 });
