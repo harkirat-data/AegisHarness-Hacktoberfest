@@ -3049,4 +3049,254 @@ class AttackController {
           return;
         }
 
+        // 2. Safe latency extraction without crash
+        const rawLatency = (typeof data.latency_ms === "number" && !isNaN(data.latency_ms))
+          ? data.latency_ms
+          : (typeof data.slaughter_latency_ms === "number" && !isNaN(data.slaughter_latency_ms) ? data.slaughter_latency_ms : null);
+
+        const latencyText = rawLatency !== null ? `${rawLatency.toFixed(2)} ms` : "Measurement unavailable";
+        const auditText = data.audit_record_index != null ? `#${data.audit_record_index}` : "Committed to ledger";
+        const pidText = data.workload_pid != null ? `PID ${data.workload_pid}` : "Workload";
+
+        if (data.verified || data.process_terminated) {
+          alert(
+            `OPERATOR KILL SWITCH ENGAGED:\n` +
+            `• Target: ${pidText}\n` +
+            `• Status: ${data.status}\n` +
+            `• Containment Latency: ${latencyText}\n` +
+            `• Audit Block: ${auditText}\n` +
+            `• Verified Slaughter: YES`
+          );
+        } else {
+          alert(`Quarantine warning: Workload state could not be verified (${data.status}).`);
+        }
+      } else {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        alert("Quarantine failed: " + (err.detail || res.statusText));
+      }
+    } catch (e) {
+      console.error("Manual kill error:", e);
+      alert("Manual kill request failed: " + e.message);
+    }
+  }
+
+  async openForensicModal() {
+    const modal = document.getElementById("forensic-modal");
+    const tbody = document.getElementById("modal-ledger-tbody");
+    if (!modal || !tbody) return;
+
+    modal.classList.remove("hidden");
+    tbody.innerHTML = '<tr><td colspan="6" class="text-muted">Loading cryptographic proof chain...</td></tr>';
+
+    try {
+      const [verifyRes, ledgerRes] = await Promise.all([
+        fetch("/api/ledger/verify"),
+        fetch("/api/ledger?limit=50"),
+      ]);
+
+      if (verifyRes.ok && ledgerRes.ok) {
+        const verifyData = await verifyRes.json();
+        const records = await ledgerRes.json();
+
+        tbody.innerHTML = "";
+        records.forEach((r) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>#${r.index}</td>
+            <td><strong class="text-cyan">${r.source_zone}</strong></td>
+            <td>${r.event_type}</td>
+            <td><span class="${r.severity.includes('CRITICAL') ? 'text-red' : 'text-emerald'}">${r.severity}</span></td>
+            <td class="text-muted">${r.previous_hash.substring(0, 10)}...</td>
+            <td class="text-cyan">${r.current_hash.substring(0, 10)}...${r.current_hash.substring(58)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+
+        const bannerText = document.getElementById("ledger-verify-text");
+        if (bannerText) {
+          bannerText.innerText = verifyData.is_valid ? "Mathematically Verified" : "INTEGRITY BREACH DETECTED";
+          bannerText.className = verifyData.is_valid ? "text-emerald" : "text-red";
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load forensic ledger:", e);
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 3.3 — CAMPAIGN EXECUTION & HUD
+  // =========================================================================
+  async checkActiveCampaign() {
+    try {
+      const res = await fetch("/api/campaign/active");
+      if (res.ok) {
+        const campaign = await res.json();
+        if (campaign && campaign.campaign_id) {
+          this.activeCampaignId = campaign.campaign_id;
+          this.showCampaignHUD(campaign);
+          this.pollCampaign(campaign.campaign_id);
+        }
+      }
+    } catch (e) {
+      // Idle
+    }
+  }
+
+  async start20Campaign() {
+    const btn = document.getElementById("btn-run-campaign") || document.getElementById("btn-run-techniques");
+    const modelSelector = document.getElementById("global-model-selector");
+    const targetModel = modelSelector ? modelSelector.value : "qwen2.5:3b";
+
+    try {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = "STARTING CAMPAIGN...";
+      }
+      const res = await fetch("/api/campaign/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_model: targetModel,
+          assistant_mode: this.chatAssistantMode || "company",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        alert(`Failed to start campaign: ${err.detail || res.statusText}`);
+        return;
+      }
+
+      const campaign = await res.json();
+      this.activeCampaignId = campaign.campaign_id;
+      this.showCampaignHUD(campaign);
+      this.pollCampaign(campaign.campaign_id);
+    } catch (e) {
+      alert("Campaign initiation failed: " + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = "C. Full 20-Technique Campaign";
+      }
+    }
+  }
+
+  showCampaignHUD(campaign) {
+    const hud = document.getElementById("campaign-hud");
+    if (!hud) return;
+    hud.style.display = "block";
+    const idEl = document.getElementById("campaign-hud-id");
+    const statEl = document.getElementById("campaign-hud-status");
+    const modelEl = document.getElementById("campaign-hud-model");
+    if (idEl) idEl.innerText = `ID: ${campaign.campaign_id.substring(0, 16)}...`;
+    if (statEl) {
+      statEl.innerText = campaign.status.toUpperCase();
+      statEl.className = campaign.status === "completed" ? "badge badge-permitted" : "badge badge-blue";
+    }
+    if (modelEl) modelEl.innerText = campaign.target_model || "qwen2.5:3b";
+  }
+
+  async pollCampaign(campaignId) {
+    if (this.campaignPollInterval) clearInterval(this.campaignPollInterval);
+
+    this.campaignPollInterval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/campaign/status/${campaignId}`);
+        if (!res.ok) return;
+        const status = await res.json();
+
+        // Update HUD
+        const currentEl = document.getElementById("campaign-hud-current");
+        const compEl = document.getElementById("campaign-hud-completed");
+        const remEl = document.getElementById("campaign-hud-remaining");
+        const errEl = document.getElementById("campaign-hud-errors");
+        const pctEl = document.getElementById("campaign-hud-percent");
+        const barEl = document.getElementById("campaign-hud-progress");
+        const statBadge = document.getElementById("campaign-hud-status");
+
+        if (currentEl) currentEl.innerText = status.current_technique || (status.status === "completed" ? "COMPLETED" : "--");
+        if (compEl) compEl.innerText = `${status.completed_attacks} / ${status.total_attacks}`;
+        if (remEl) remEl.innerText = status.remaining_attacks;
+        if (errEl) errEl.innerText = status.errors ? status.errors.length : 0;
+        const pct = status.progress_percent || 0;
+        if (pctEl) pctEl.innerText = `${pct.toFixed(0)}%`;
+        if (barEl) barEl.style.width = `${pct}%`;
+        if (statBadge) {
+          statBadge.innerText = status.status.toUpperCase();
+          statBadge.className = status.status === "completed" ? "badge badge-permitted" : (status.status === "cancelled" ? "badge badge-blocked" : "badge badge-blue");
+        }
+
+        // Live architecture animation on current attack
+        if (status.current_technique) {
+          this.animateArchitectureStage("INFERENCE");
+        }
+
+        // Refresh SOC overview metrics
+        this.loadSOCDashboard();
+
+        if (status.status === "completed" || status.status === "cancelled" || status.status === "failed") {
+          clearInterval(this.campaignPollInterval);
+          this.campaignPollInterval = null;
+
+          // Record results in the in-page table
+          if (status.results && status.results.length > 0) {
+            status.results.forEach((r) => {
+              if (!this.executionRecords[r.execution_id]) {
+                const norm = {
+                  execution_id: r.execution_id,
+                  model_name: status.target_model,
+                  target_model: status.target_model,
+                  model_decision: r.final_outcome || "MODEL_EVALUATED",
+                  pep_decision: r.pep_decision || "NOT EXECUTED",
+                  outcome_type: r.final_outcome,
+                  audit_hash: r.audit_hash,
+                  category: r.category,
+                };
+                this.recordTestRun(norm, `Technique: ${r.technique_name || r.technique_id}`, r.category, r.execution_id);
+              }
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Polling error", e);
+      }
+    }, 1500);
+  }
+
+  async cancelActiveCampaign() {
+    if (!this.activeCampaignId) return;
+    try {
+      await fetch(`/api/campaign/cancel/${this.activeCampaignId}`, { method: "POST" });
+      const statBadge = document.getElementById("campaign-hud-status");
+      if (statBadge) {
+        statBadge.innerText = "CANCELLED";
+        statBadge.className = "badge badge-blocked";
+      }
+    } catch (e) {
+      console.error("Failed to cancel campaign", e);
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 2 — JAILBREAK LIBRARY
+  // =========================================================================
+  async openJailbreakLibrary() {
+    const modal = document.getElementById("jailbreak-modal");
+    if (!modal) return;
+    modal.classList.remove("hidden");
+    await this.fetchJailbreaks("all");
+
+    // Wire category filter buttons
+    const filterContainer = document.getElementById("jailbreak-category-filter");
+    if (filterContainer && !this.jbFilterWired) {
+      this.jbFilterWired = true;
+      filterContainer.querySelectorAll("button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          filterContainer.querySelectorAll("button").forEach((b) => b.classList.remove("active", "btn-primary"));
+          filterContainer.querySelectorAll("button").forEach((b) => b.classList.add("btn-secondary"));
+          btn.classList.add("active", "btn-primary");
+          btn.classList.remove("btn-secondary");
+          const cat = btn.getAttribute("data-cat");
+          this.renderJailbreakList(cat);
+
 }
