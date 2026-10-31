@@ -3748,5 +3748,155 @@ class AttackController {
   }
 
   async loadSOCAnalytics() {
+    try {
+      const res = await fetch("/api/soc/analytics");
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Render Categories
+      const catCont = document.getElementById("soc-analytics-categories");
+      if (catCont) {
+        catCont.innerHTML = "";
+        const entries = Object.entries(data.categories || {});
+        if (entries.length === 0) {
+          catCont.innerHTML = '<div class="text-muted" style="text-align:center;padding:1rem;">No attack data recorded yet.</div>';
+        } else {
+          const maxVal = Math.max(...entries.map(([, count]) => count), 1);
+          entries.forEach(([cat, count]) => {
+            const pct = Math.max(12, Math.round((count / maxVal) * 100));
+            const row = document.createElement("div");
+            row.style.marginBottom = "8px";
+            row.innerHTML = `
+              <div style="display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 3px;">
+                <span style="font-weight: 600; color: #1e293b;">${cat}</span>
+                <span style="font-weight: 700; color: #2563eb;">${count} attacks</span>
+              </div>
+              <div class="soc-bar-track" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 4px 0;">
+                <div class="soc-bar-fill fill-blue" style="height: 100%; width: ${pct}%; background: linear-gradient(90deg, #3b82f6, #60a5fa); border-radius: 4px; transition: width 0.4s ease;"></div>
+              </div>
+            `;
+            catCont.appendChild(row);
+          });
+        }
+      }
+
+      // Render Severity
+      const sevCont = document.getElementById("soc-analytics-severity");
+      if (sevCont) {
+        sevCont.innerHTML = "";
+        const sevEntries = Object.entries(data.severities || {});
+        if (sevEntries.length === 0) {
+          sevCont.innerHTML = '<div class="text-muted" style="text-align:center;padding:1rem;">No security incident recorded yet.</div>';
+        } else {
+          const maxVal = Math.max(...sevEntries.map(([, count]) => count), 1);
+          sevEntries.forEach(([sev, count]) => {
+            const pct = Math.max(12, Math.round((count / maxVal) * 100));
+            const isCrit = sev.includes("CRITICAL");
+            const isHigh = sev.includes("HIGH");
+            const colorGrad = isCrit ? "linear-gradient(90deg, #ef4444, #f87171)" : (isHigh ? "linear-gradient(90deg, #f59e0b, #fbbf24)" : "linear-gradient(90deg, #3b82f6, #60a5fa)");
+            const colorClass = isCrit ? "fill-red" : (isHigh ? "fill-amber" : "fill-blue");
+            const row = document.createElement("div");
+            row.style.marginBottom = "8px";
+            row.innerHTML = `
+              <div style="display: flex; justify-content: space-between; font-size: 0.72rem; margin-bottom: 3px;">
+                <span style="font-weight: 600; color: #1e293b;">${sev}</span>
+                <span style="font-weight: 700;">${count} incidents</span>
+              </div>
+              <div class="soc-bar-track" style="width: 100%; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin: 4px 0;">
+                <div class="soc-bar-fill ${colorClass}" style="height: 100%; width: ${pct}%; background: ${colorGrad}; border-radius: 4px; transition: width 0.4s ease;"></div>
+              </div>
+            `;
+            sevCont.appendChild(row);
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load SOC analytics", e);
+    }
+  }
+
+  async loadSOCIncidents() {
+    try {
+      const res = await fetch("/api/soc/incidents");
+      if (!res.ok) return;
+      const data = await res.json();
+      const tbody = document.getElementById("soc-incidents-tbody");
+      if (!tbody) return;
+
+      tbody.innerHTML = "";
+      const incidents = Array.isArray(data) ? data : (data.incidents || []);
+      if (!incidents || incidents.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="9" class="text-muted" style="text-align: center; padding: 1.5rem;">
+              No incidents logged yet. Attacks proposing unauthorized operations or violating policy will register here.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      incidents.forEach((inc) => {
+        const tr = document.createElement("tr");
+        const isCrit = inc.severity && (inc.severity.includes("CRITICAL") || inc.severity.includes("HIGH"));
+        const sevBadge = isCrit ? "badge-blocked" : "badge-neutral";
+        const pepBadge = inc.pep_decision === "DENIED" ? "badge-blocked" : (inc.pep_decision === "AUTHORIZED" ? "badge-permitted" : "badge-neutral");
+        const timeStr = inc.timestamp ? new Date(inc.timestamp).toLocaleTimeString() : "--";
+
+        tr.innerHTML = `
+          <td class="font-mono text-blue" style="font-size: 0.72rem;">${inc.incident_id}</td>
+          <td><span class="badge badge-neutral">${inc.attack_category}</span></td>
+          <td>${inc.target_model}</td>
+          <td><span class="badge ${sevBadge}">${inc.severity}</span></td>
+          <td style="font-size: 0.72rem;">${timeStr}</td>
+          <td><span class="badge ${pepBadge}">${inc.pep_decision}</span></td>
+          <td class="font-mono" style="font-size: 0.72rem;">${inc.resource_affected || 'NONE'}</td>
+          <td><span class="badge badge-blue">${inc.containment_status}</span></td>
+          <td><button class="btn btn-secondary btn-sm" style="padding: 2px 6px; font-size: 0.7rem;" onclick="window.attackController.openIncidentDetail('${inc.incident_id}')">Inspect</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Synchronize Motion Graph with real incidents from SOC store
+      if ((!this.motionEvents || this.motionEvents.length === 0) && incidents.length > 0) {
+        const recent = incidents.slice(0, 15).reverse();
+        recent.forEach((inc) => {
+          const isBreach = inc.severity && (inc.severity.includes("CRITICAL") || inc.containment_status === "QUARANTINED");
+          const timeStr = inc.timestamp ? new Date(inc.timestamp).toLocaleTimeString() : "--";
+          this.motionEvents.push({
+            id: inc.incident_id,
+            time: timeStr,
+            category: inc.attack_category || "Security Incident",
+            llmReaction: inc.pep_decision === "DENIED" ? "Exploit Trapped by Policy" : "Model Direct Response",
+            enforcement: inc.pep_decision === "DENIED" ? "PEP_DEFENSE_BLOCKED" : (isBreach ? "CONFIRMED_BREACH -> SLAUGHTER" : "PEP_AUTHORIZED"),
+            severity: inc.severity || "MEDIUM",
+            status: inc.pep_decision || "BLOCKED",
+            isBreach: isBreach
+          });
+        });
+        const cnt = document.getElementById("motion-node-count");
+        if (cnt) cnt.innerText = `${this.motionEvents.length} Incident Nodes`;
+        this.renderMotionGraph();
+      }
+    } catch (e) {
+      console.error("Failed to load SOC incidents", e);
+    }
+  }
+
+  async openIncidentDetail(incidentId) {
+    try {
+      const res = await fetch(`/api/soc/incidents/${incidentId}`);
+      if (!res.ok) return;
+      const inc = await res.json();
+
+      const modal = document.getElementById("incident-detail-modal");
+      if (!modal) return;
+      modal.classList.remove("hidden");
+
+      const idEl = document.getElementById("inc-modal-id");
+      const sevEl = document.getElementById("inc-modal-severity");
+      const pepEl = document.getElementById("inc-modal-pep");
+      const modelEl = document.getElementById("inc-modal-model");
+      const contEl = document.getElementById("inc-modal-containment");
 
 }
