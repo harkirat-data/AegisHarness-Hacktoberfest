@@ -1048,5 +1048,67 @@ async function updateModelChip() {
 
   try {
     const res = await fetch('/api/agent/status');
+    const data = await res.json();
+    if (data.online) {
+      if (dot) dot.className = 'dot dot-green';
+      if (label) label.textContent = `${data.model} — Online`;
+    } else {
+      if (dot) dot.className = 'dot dot-yellow';
+      if (label) label.textContent = `${data.model} — Start Ollama`;
+    }
+  } catch {
+    if (dot) dot.className = 'dot dot-red';
+    if (label) label.textContent = 'API Unreachable';
+  }
+}
 
-});
+// ===== DEMO RESET =====
+async function resetDemo() {
+  if (!confirm('Reset the demo environment? This clears sandbox files and resets the demo database.')) return;
+  try {
+    const res = await fetch('/api/demo/reset', { method: 'POST' });
+    const data = await res.json();
+    clearChat();
+    loadSandboxFiles();
+    alert(`Demo environment reset. ${data.message || ''}`);
+  } catch (e) {
+    alert(`Reset failed: ${e.message}`);
+  }
+}
+
+// ===== INIT =====
+async function init() {
+  connectWS();
+  loadScenarios();
+  refreshStats();
+  loadLedger();
+  loadSandboxFiles();
+  updateModelChip();
+
+  // Sync model select to label
+  const globalSel = document.getElementById('global-model-selector') || document.getElementById('model-select');
+  if (globalSel) {
+    state.activeModel = globalSel.value || state.activeModel;
+  }
+  const activeLabel = document.getElementById('active-model-label');
+  if (activeLabel) activeLabel.textContent = state.activeModel;
+
+  // Pre-fill Blue Team operator kill switch with active session ID
+  const qInput = document.getElementById('quarantine-session');
+  if (qInput) qInput.value = state.sessionId;
+
+  // Initialize active disposable sandbox for initial session
+  fetch('/api/sandbox/provision', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: state.sessionId }),
+  }).then(() => {
+    updateSandboxStateChips('ACTIVE');
+  }).catch(() => {});
+
+  // Poll for stats every 10s
+  setInterval(refreshStats, 10000);
+  setInterval(updateModelChip, 30000);
+}
+
+document.addEventListener('DOMContentLoaded', init);
