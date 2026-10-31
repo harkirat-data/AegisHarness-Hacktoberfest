@@ -75,6 +75,9 @@
   // =========================================================================
   // ARTIFACT 1: HERO - THE AEGIS POLICY BOUNDARY
   // =========================================================================
+  // =========================================================================
+  // ARTIFACT 1: HERO - LLM NEURAL SENTRY & ZERO-TRUST POLICY ENCLAVE
+  // =========================================================================
   function initHeroPolicyBoundary() {
     const stage = document.getElementById('hero-3d-stage');
     const canvas = document.getElementById('hero-3d-canvas');
@@ -88,94 +91,139 @@
     const rootGroup = new THREE.Group();
     scene.add(rootGroup);
 
-    // 1. Central Protected Core (Small Geometric Monolith / Cube)
-    const coreGeo = new THREE.BoxGeometry(0.85, 1.15, 0.85);
-    const coreMat = new THREE.MeshStandardMaterial({
-      color: PALETTE.charcoalDark,
-      roughness: 0.25,
-      metalness: 0.8,
-    });
-    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    rootGroup.add(coreMesh);
+    // 1. LLM NEURAL INFERENCE CORE (Protected in-memory weights chamber)
+    const coreGroup = new THREE.Group();
+    rootGroup.add(coreGroup);
 
-    // Bevel seam wireframe for core
-    const coreEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(coreGeo),
-      new THREE.LineBasicMaterial({ color: 0x333333, linewidth: 1 })
-    );
-    coreMesh.add(coreEdges);
-
-    // 2. Outer Containment Boundary (Architectural Wireframe Dodecahedron)
-    const outerGeo = new THREE.DodecahedronGeometry(2.35, 0);
-    const outerEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(outerGeo),
-      new THREE.LineBasicMaterial({ color: PALETTE.charcoal, transparent: true, opacity: 0.65 })
-    );
-    rootGroup.add(outerEdges);
-
-    // Translucent facets
-    const outerFacets = new THREE.Mesh(
-      outerGeo,
-      new THREE.MeshBasicMaterial({
-        color: PALETTE.bgAlt,
-        transparent: true,
-        opacity: 0.12,
-        side: THREE.DoubleSide,
-      })
-    );
-    rootGroup.add(outerFacets);
-
-    // 3. Multiple Boundary Layers
-    // Layer 1: Inner Octahedron Wireframe
-    const innerGeo = new THREE.OctahedronGeometry(1.55, 0);
-    const innerEdges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(innerGeo),
-      new THREE.LineBasicMaterial({ color: PALETTE.borderDark, transparent: true, opacity: 0.45 })
-    );
-    rootGroup.add(innerEdges);
-
-    // Layer 2: Equatorial Horizon Coordinate Ring
-    const ringGeo = new THREE.RingGeometry(1.95, 2.0, 64);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: PALETTE.borderDark,
-      side: THREE.DoubleSide,
+    // Outer translucent chamber (Smoky charcoal frosted chamber)
+    const chamberGeo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+    const chamberMat = new THREE.MeshStandardMaterial({
+      color: 0x1A1A1A,
+      roughness: 0.15,
+      metalness: 0.2,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.35,
     });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.rotation.x = Math.PI / 2.3;
-    rootGroup.add(ringMesh);
+    const chamberMesh = new THREE.Mesh(chamberGeo, chamberMat);
+    coreGroup.add(chamberMesh);
 
-    // 4. Policy Checkpoints (Precise nodes on boundary vertices)
-    const checkpointNodes = [];
-    const nodeGeo = new THREE.OctahedronGeometry(0.075, 0);
-    const nodePos = outerGeo.attributes.position;
-    const addedPoints = new Set();
+    const chamberEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(chamberGeo),
+      new THREE.LineBasicMaterial({ color: PALETTE.charcoal, transparent: true, opacity: 0.6 })
+    );
+    chamberMesh.add(chamberEdges);
 
-    for (let i = 0; i < nodePos.count; i++) {
-      const v = new THREE.Vector3().fromBufferAttribute(nodePos, i);
-      const key = `${v.x.toFixed(2)},${v.y.toFixed(2)},${v.z.toFixed(2)}`;
-      if (!addedPoints.has(key)) {
-        addedPoints.add(key);
-        const nodeMat = new THREE.MeshBasicMaterial({ color: 0x555555 });
-        const node = new THREE.Mesh(nodeGeo, nodeMat);
-        node.position.copy(v);
-        rootGroup.add(node);
-        checkpointNodes.push({ mesh: node, baseColor: 0x555555, pulse: 0 });
+    // Neural Synapse Lattice (3x3x3 grid of neural attention nodes)
+    const neuralNodes = [];
+    const nodeGeo = new THREE.SphereGeometry(0.045, 16, 16);
+    const nodeMatIdle = new THREE.MeshBasicMaterial({ color: 0x333333 });
+    const positions = [];
+
+    for (let x = -0.38; x <= 0.38; x += 0.38) {
+      for (let y = -0.38; y <= 0.38; y += 0.38) {
+        for (let z = -0.38; z <= 0.38; z += 0.38) {
+          const nMesh = new THREE.Mesh(nodeGeo, nodeMatIdle.clone());
+          nMesh.position.set(x, y, z);
+          coreGroup.add(nMesh);
+          neuralNodes.push({ mesh: nMesh, basePos: new THREE.Vector3(x, y, z), pulse: 0 });
+          positions.push(new THREE.Vector3(x, y, z));
+        }
       }
     }
 
-    // 5. Incoming Signal Particles (Aegis Red / Orange)
-    const PARTICLE_COUNT = 18;
-    const particles = [];
-    const pGeo = new THREE.OctahedronGeometry(0.045, 0);
+    // Connect nearest nodes with synaptic lines
+    const linePoints = [];
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        if (positions[i].distanceTo(positions[j]) < 0.45) {
+          linePoints.push(positions[i], positions[j]);
+        }
+      }
+    }
+    const synapseGeo = new THREE.BufferGeometry().setFromPoints(linePoints);
+    const synapseMat = new THREE.LineBasicMaterial({
+      color: PALETTE.borderDark,
+      transparent: true,
+      opacity: 0.35,
+    });
+    const synapseLines = new THREE.LineSegments(synapseGeo, synapseMat);
+    coreGroup.add(synapseLines);
 
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const pMat = new THREE.MeshBasicMaterial({ color: PALETTE.red, transparent: true, opacity: 0.9 });
-      const pMesh = new THREE.Mesh(pGeo, pMat);
-      rootGroup.add(pMesh);
+    // Center Primary Attention Core Node (Pulsing seed)
+    const centerNodeGeo = new THREE.OctahedronGeometry(0.12, 0);
+    const centerNodeMat = new THREE.MeshBasicMaterial({ color: PALETTE.sage });
+    const centerNode = new THREE.Mesh(centerNodeGeo, centerNodeMat);
+    coreGroup.add(centerNode);
 
-      // Random starting direction in untrusted outer space
+    // 2. CONCENTRIC ZERO-TRUST DEFENSIVE SHIELD RINGS (Policy Enforcement Matrix)
+    const shieldGroup = new THREE.Group();
+    rootGroup.add(shieldGroup);
+
+    // Ring 1 (Inner: Memory & Process Sandbox Boundary)
+    const ring1Geo = new THREE.TorusGeometry(1.45, 0.02, 16, 80);
+    const ring1Mat = new THREE.MeshBasicMaterial({
+      color: PALETTE.sage,
+      transparent: true,
+      opacity: 0.75,
+    });
+    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+    ring1.rotation.x = Math.PI / 2.2;
+    shieldGroup.add(ring1);
+
+    // Ring 2 (Middle: Policy Enforcement Point & AST Sentry)
+    const ring2Geo = new THREE.TorusGeometry(1.85, 0.03, 16, 96);
+    const ring2Mat = new THREE.MeshBasicMaterial({
+      color: PALETTE.charcoal,
+      transparent: true,
+      opacity: 0.8,
+    });
+    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    shieldGroup.add(ring2);
+
+    // Precision checkpoint inspection apertures on Ring 2
+    const checkpointNodes = [];
+    const checkpointGeo = new THREE.OctahedronGeometry(0.065, 0);
+    const CHECKPOINT_COUNT = 8;
+    for (let i = 0; i < CHECKPOINT_COUNT; i++) {
+      const angle = (i / CHECKPOINT_COUNT) * Math.PI * 2;
+      const cpMat = new THREE.MeshBasicMaterial({ color: 0x555555 });
+      const cp = new THREE.Mesh(checkpointGeo, cpMat);
+      cp.position.set(Math.cos(angle) * 1.85, Math.sin(angle) * 1.85, 0);
+      ring2.add(cp);
+      checkpointNodes.push({ mesh: cp, basePos: cp.position.clone(), pulse: 0 });
+    }
+
+    // Ring 3 (Outer: Zero-Egress Network Perimeter)
+    const ring3Geo = new THREE.TorusGeometry(2.25, 0.022, 16, 96);
+    const ring3Mat = new THREE.MeshBasicMaterial({
+      color: PALETTE.borderDark,
+      transparent: true,
+      opacity: 0.6,
+    });
+    const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
+    ring3.rotation.y = Math.PI / 3;
+    ring3.rotation.z = Math.PI / 6;
+    shieldGroup.add(ring3);
+
+    // Subtle geodesic outer sensor halo
+    const haloGeo = new THREE.IcosahedronGeometry(2.45, 1);
+    const haloEdges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(haloGeo),
+      new THREE.LineBasicMaterial({ color: PALETTE.lineMuted, transparent: true, opacity: 0.25 })
+    );
+    rootGroup.add(haloEdges);
+
+    // 3. ADVERSARIAL TOKEN PARTICLES (Jailbreaks & Prompt Injections)
+    const ADVERSARIAL_COUNT = 14;
+    const adversarialTokens = [];
+    const advGeo = new THREE.ConeGeometry(0.065, 0.22, 4);
+    advGeo.rotateX(Math.PI / 2);
+
+    for (let i = 0; i < ADVERSARIAL_COUNT; i++) {
+      const advMat = new THREE.MeshBasicMaterial({ color: PALETTE.red, transparent: true, opacity: 0.9 });
+      const mesh = new THREE.Mesh(advGeo, advMat);
+      rootGroup.add(mesh);
+
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(Math.random() * 2 - 1);
       const dir = new THREE.Vector3(
@@ -184,18 +232,28 @@
         Math.cos(phi)
       ).normalize();
 
-      particles.push({
-        mesh: pMesh,
+      mesh.lookAt(dir.clone().negate());
+
+      adversarialTokens.push({
+        mesh: mesh,
         dir: dir,
-        dist: 3.8 + Math.random() * 1.5,
-        speed: 0.012 + Math.random() * 0.008,
-        deflecting: false,
+        dist: 3.6 + Math.random() * 1.4,
+        speed: 0.014 + Math.random() * 0.008,
+        deflected: false,
         deflectVec: new THREE.Vector3(),
         opacity: 0.9,
       });
     }
 
-    // Mouse & Inertia Interaction
+    // 4. LEGITIMATE INFERENCE TOKEN (Authorized Query Pulse)
+    const legitimateGeo = new THREE.SphereGeometry(0.07, 12, 12);
+    const legitimateMat = new THREE.MeshBasicMaterial({ color: PALETTE.cream, transparent: true, opacity: 0.85 });
+    const legitimateToken = new THREE.Mesh(legitimateGeo, legitimateMat);
+    rootGroup.add(legitimateToken);
+    let legDist = 3.8;
+    const legDir = new THREE.Vector3(1, 0.4, 0.3).normalize();
+
+    // Interaction & Inertia
     let isDragging = false, lastX = 0, lastY = 0, lastTime = 0;
     let vx = 0, vy = 0;
     let mouseParallaxX = 0, mouseParallaxY = 0;
@@ -212,8 +270,8 @@
 
     stage.addEventListener('pointermove', (e) => {
       const rect = stage.getBoundingClientRect();
-      mouseParallaxX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.6;
-      mouseParallaxY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.4;
+      mouseParallaxX = ((e.clientX - rect.left) / rect.width - 0.5) * 0.55;
+      mouseParallaxY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.35;
 
       if (!isDragging) return;
       const now = performance.now();
@@ -235,17 +293,16 @@
     stage.addEventListener('pointercancel', stopDrag);
 
     // Resize handler
-    const onResize = () => {
+    window.addEventListener('resize', () => {
       if (!stage.clientWidth || !stage.clientHeight) return;
       camera.aspect = stage.clientWidth / stage.clientHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(stage.clientWidth, stage.clientHeight, false);
-    };
-    window.addEventListener('resize', onResize);
+    });
 
     // Animation Loop
     let clock = new THREE.Clock();
-    let shellPulse = 0;
+    let neuralGlow = 0;
 
     function renderFrame() {
       if (!isVisible) return;
@@ -255,95 +312,115 @@
       const time = clock.getElapsedTime();
 
       if (!REDUCED_MOTION) {
-        // Inertia or slow precise engineered rotation
-        if (isDragging) {
-          // Handled in pointermove
-        } else {
-          rootGroup.rotation.y += (vx * delta * 0.06) + 0.0025;
+        if (!isDragging) {
+          rootGroup.rotation.y += (vx * delta * 0.06) + 0.0028;
           rootGroup.rotation.x += (vy * delta * 0.06);
           vx *= 0.94;
           vy *= 0.94;
 
-          // Camera gentle parallax lerp
           camera.position.x += (mouseParallaxX - camera.position.x) * 0.05;
           camera.position.y += (-mouseParallaxY - camera.position.y) * 0.05;
           camera.lookAt(0, 0, 0);
 
-          // Independent layer rotations
-          innerEdges.rotation.y = time * 0.06;
-          innerEdges.rotation.x = Math.sin(time * 0.3) * 0.1;
+          // Precision independent gimbal rotations
+          ring1.rotation.z = time * 0.22;
+          ring2.rotation.z = -time * 0.18;
+          ring3.rotation.z = time * 0.14;
 
-          ringMesh.rotation.z = time * 0.04;
-          coreMesh.position.y = Math.sin(time * 1.2) * 0.04;
-          coreMesh.rotation.y = -time * 0.08;
+          // Core idle breathing & neural pulse
+          coreGroup.rotation.y = time * 0.06;
+          coreGroup.position.y = Math.sin(time * 1.3) * 0.05;
+          centerNode.rotation.y = time * 0.8;
+          centerNode.scale.setScalar(1.0 + Math.sin(time * 3.0) * 0.15);
         }
 
-        // Particle dynamics & boundary deflection
-        particles.forEach((p) => {
-          if (!p.deflecting) {
-            p.dist -= p.speed;
-            p.mesh.position.copy(p.dir).multiplyScalar(p.dist);
+        // 1. Adversarial Ingress Interception Dynamics (PEP Sentry at radius 1.85)
+        adversarialTokens.forEach((tok) => {
+          if (!tok.deflected) {
+            tok.dist -= tok.speed;
+            tok.mesh.position.copy(tok.dir).multiplyScalar(tok.dist);
 
-            // Check boundary collision (radius ~ 2.35)
-            if (p.dist <= 2.35) {
-              p.deflecting = true;
-              shellPulse = 1.0;
+            // Intercepted at PEP boundary (radius 1.85)
+            if (tok.dist <= 1.85) {
+              tok.deflected = true;
 
-              // Find closest checkpoint node and pulse it
+              // Pulse nearest checkpoint aperture in red
               let closest = checkpointNodes[0], minDist = Infinity;
-              checkpointNodes.forEach((cn) => {
-                const d = cn.mesh.position.distanceTo(p.mesh.position);
-                if (d < minDist) { minDist = d; closest = cn; }
+              checkpointNodes.forEach((cp) => {
+                const worldPos = new THREE.Vector3();
+                cp.mesh.getWorldPosition(worldPos);
+                const d = worldPos.distanceTo(tok.mesh.position);
+                if (d < minDist) { minDist = d; closest = cp; }
               });
               if (closest) closest.pulse = 1.0;
 
-              // Deterministic tangential deflection vector
-              p.deflectVec.copy(p.dir).cross(new THREE.Vector3(0, 1, 0)).normalize();
-              if (Math.random() > 0.5) p.deflectVec.negate();
-              p.deflectVec.add(p.dir.clone().multiplyScalar(0.4)).normalize();
+              // Tangential deflection vector (never reaches inner core!)
+              tok.deflectVec.copy(tok.dir).cross(new THREE.Vector3(0, 1, 0)).normalize();
+              if (Math.random() > 0.5) tok.deflectVec.negate();
+              tok.deflectVec.add(tok.dir.clone().multiplyScalar(0.5)).normalize();
+              tok.mesh.lookAt(tok.mesh.position.clone().add(tok.deflectVec));
             }
           } else {
-            // Deflection / dissolving path
-            p.mesh.position.addScaledVector(p.deflectVec, p.speed * 1.5);
-            p.opacity -= delta * 1.8;
-            p.mesh.material.opacity = Math.max(0, p.opacity);
+            // Deflected trajectory: travels away and dissolves
+            tok.mesh.position.addScaledVector(tok.deflectVec, tok.speed * 1.8);
+            tok.opacity -= delta * 1.8;
+            tok.mesh.material.opacity = Math.max(0, tok.opacity);
 
-            if (p.opacity <= 0) {
-              // Reset particle back in outer untrusted space
+            if (tok.opacity <= 0) {
               const theta = Math.random() * Math.PI * 2;
               const phi = Math.acos(Math.random() * 2 - 1);
-              p.dir.set(
+              tok.dir.set(
                 Math.sin(phi) * Math.cos(theta),
                 Math.sin(phi) * Math.sin(theta),
                 Math.cos(phi)
               ).normalize();
-              p.dist = 4.2 + Math.random() * 1.2;
-              p.opacity = 0.9;
-              p.mesh.material.opacity = 0.9;
-              p.deflecting = false;
+              tok.dist = 3.6 + Math.random() * 1.2;
+              tok.opacity = 0.9;
+              tok.mesh.material.opacity = 0.9;
+              tok.mesh.lookAt(tok.dir.clone().negate());
+              tok.deflected = false;
             }
           }
         });
 
-        // Decay checkpoint node pulses
-        checkpointNodes.forEach((cn) => {
-          if (cn.pulse > 0) {
-            cn.pulse = Math.max(0, cn.pulse - delta * 3.0);
-            cn.mesh.material.color.setHex(cn.pulse > 0.1 ? PALETTE.red : cn.baseColor);
+        // 2. Legitimate Query Token (Smoothly passes through to neural core)
+        legDist -= 0.018;
+        if (legDist > 0.1) {
+          legitimateToken.position.copy(legDir).multiplyScalar(legDist);
+          legitimateToken.material.opacity = 0.85;
+        } else {
+          // Reached core: triggers emerald neural propagation wave!
+          neuralGlow = 1.0;
+          legDist = 3.8;
+        }
+
+        // Neural Lattice Propagation Glow
+        if (neuralGlow > 0) {
+          neuralGlow = Math.max(0, neuralGlow - delta * 2.2);
+          neuralNodes.forEach((n, idx) => {
+            const delay = (idx % 3) * 0.1;
+            const factor = Math.max(0, neuralGlow - delay);
+            if (factor > 0.1) {
+              n.mesh.material.color.setHex(PALETTE.sage);
+            } else {
+              n.mesh.material.color.setHex(0x333333);
+            }
+          });
+          synapseMat.color.setHex(neuralGlow > 0.2 ? PALETTE.sage : PALETTE.borderDark);
+        }
+
+        // Decay checkpoint nodes
+        checkpointNodes.forEach((cp) => {
+          if (cp.pulse > 0) {
+            cp.pulse = Math.max(0, cp.pulse - delta * 3.0);
+            cp.mesh.material.color.setHex(cp.pulse > 0.1 ? PALETTE.red : 0x555555);
           }
         });
-
-        // Shell deflection shimmer
-        if (shellPulse > 0) {
-          shellPulse = Math.max(0, shellPulse - delta * 2.5);
-          outerEdges.material.opacity = 0.65 + shellPulse * 0.3;
-        }
       }
 
       renderer.render(scene, camera);
     }
 
-    // IntersectionObserver to pause rendering when off-screen
     if ('IntersectionObserver' in window) {
       const io = new IntersectionObserver(([entry]) => {
         isVisible = entry.isIntersecting;

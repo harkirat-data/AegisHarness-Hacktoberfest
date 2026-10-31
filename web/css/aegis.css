@@ -1945,6 +1945,11 @@ body {
   pointer-events: none;
 }
 
+.motion-badge-chip.top-left {
+  top: 18px;
+  left: 18px;
+}
+
 .motion-badge-chip.top-right {
   top: 18px;
   right: 18px;
