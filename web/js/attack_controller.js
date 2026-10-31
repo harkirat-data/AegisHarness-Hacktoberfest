@@ -649,6 +649,14 @@ class AttackController {
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
+        const footerLaunchBtn = document.getElementById("btn-footer-launch-dashboard");
+    if (footerLaunchBtn) footerLaunchBtn.addEventListener("click", () => showDashboard("pane-company"));
+    
+    // Initialize Motionsites 3D WebGL, 3D Tilt & Magnetic Physics
+    if (typeof initMotionsites3D === "function") initMotionsites3D();
+    if (typeof init3DCardTilt === "function") init3DCardTilt();
+    if (typeof initMagneticButtons === "function") initMagneticButtons();
+
     if (heroLaunchBtn) heroLaunchBtn.addEventListener("click", () => showDashboard("pane-company"));
     if (headerBackBtn) headerBackBtn.addEventListener("click", () => showLanding());
     if (brandHomeBtn) {
@@ -3936,4 +3944,226 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initAttackController);
 } else {
   initAttackController();
+}
+
+
+// =========================================================================
+// MOTIONSITES 3D WEBGL ISOLATION CORE & INTERACTIVE DEPTH
+// =========================================================================
+function initMotionsites3D() {
+  const stage = document.getElementById("hero-3d-stage");
+  const canvas = document.getElementById("hero-3d-canvas");
+  if (!stage || !canvas || typeof THREE === "undefined") return;
+
+  let renderer, scene, camera;
+  let coreGroup, outerMesh, innerMesh1, innerMesh2, particles;
+  let isDragging = false, lastX = 0, lastY = 0, lastTime = 0;
+  let vx = 0, vy = 0;
+  let isVisible = true;
+  let idleTime = 0;
+
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setSize(stage.clientWidth, stage.clientHeight);
+  } catch (e) {
+    console.warn("[Motionsites 3D] WebGL not available:", e);
+    return;
+  }
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(35, stage.clientWidth / stage.clientHeight, 0.1, 100);
+  camera.position.z = 7.5;
+
+  coreGroup = new THREE.Group();
+  scene.add(coreGroup);
+
+  // 1. Outer Wireframe Icosahedron (Zero-Trust Sandbox Outer Boundary)
+  const outerGeo = new THREE.IcosahedronGeometry(2.1, 1);
+  const outerMat = new THREE.MeshBasicMaterial({
+    color: 0xB23A22,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.75,
+  });
+  outerMesh = new THREE.Mesh(outerGeo, outerMat);
+  coreGroup.add(outerMesh);
+
+  // 2. Inner Rotating Rings (Policy Enforcement Gate)
+  const ringGeo1 = new THREE.TorusGeometry(1.4, 0.04, 16, 64);
+  const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x1E653A, transparent: true, opacity: 0.85 });
+  innerMesh1 = new THREE.Mesh(ringGeo1, ringMat1);
+  coreGroup.add(innerMesh1);
+
+  const ringGeo2 = new THREE.TorusGeometry(1.1, 0.03, 16, 64);
+  const ringMat2 = new THREE.MeshBasicMaterial({ color: 0x8C827A, transparent: true, opacity: 0.7 });
+  innerMesh2 = new THREE.Mesh(ringGeo2, ringMat2);
+  innerMesh2.rotation.x = Math.PI / 2;
+  coreGroup.add(innerMesh2);
+
+  // 3. Central Cryptographic Seed Node (WORM Root)
+  const seedGeo = new THREE.OctahedronGeometry(0.55);
+  const seedMat = new THREE.MeshBasicMaterial({ color: 0x1A1A1A, wireframe: true });
+  const seedMesh = new THREE.Mesh(seedGeo, seedMat);
+  coreGroup.add(seedMesh);
+
+  // 4. Orbiting Security Particle Tokens (80 particles)
+  const particleCount = 90;
+  const particleGeo = new THREE.BufferGeometry();
+  const positions = new Float32Array(particleCount * 3);
+  for (let i = 0; i < particleCount * 3; i += 3) {
+    const radius = 2.6 + Math.random() * 0.9;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(Math.random() * 2 - 1);
+    positions[i] = radius * Math.sin(phi) * Math.cos(theta);
+    positions[i + 1] = radius * Math.sin(phi) * Math.sin(theta);
+    positions[i + 2] = radius * Math.cos(phi);
+  }
+  particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const particleMat = new THREE.PointsMaterial({
+    color: 0xB23A22,
+    size: 0.06,
+    transparent: true,
+    opacity: 0.65,
+  });
+  particles = new THREE.Points(particleGeo, particleMat);
+  coreGroup.add(particles);
+
+  // Mouse drag & momentum rotation
+  stage.addEventListener("pointerdown", (e) => {
+    isDragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastTime = performance.now();
+    vx = 0;
+    vy = 0;
+    stage.setPointerCapture(e.pointerId);
+  });
+
+  stage.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - lastTime);
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastTime = now;
+
+    coreGroup.rotation.y += dx * 0.007;
+    coreGroup.rotation.x += dy * 0.007;
+
+    vx = (dx / dt) * 15;
+    vy = (dy / dt) * 15;
+    idleTime = 0;
+  });
+
+  const stopDrag = () => { isDragging = false; };
+  stage.addEventListener("pointerup", stopDrag);
+  stage.addEventListener("pointercancel", stopDrag);
+
+  // Resize handler
+  window.addEventListener("resize", () => {
+    if (!stage.clientWidth || !stage.clientHeight) return;
+    camera.aspect = stage.clientWidth / stage.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(stage.clientWidth, stage.clientHeight);
+  });
+
+  // Animation Loop with Idle Sway and Friction Decay
+  let clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    if (!isVisible) return;
+
+    const delta = clock.getDelta();
+    const time = clock.getElapsedTime();
+
+    if (!isDragging) {
+      // Inertia decay
+      coreGroup.rotation.y += vx * delta * 0.08;
+      coreGroup.rotation.x += vy * delta * 0.08;
+      vx *= 0.93;
+      vy *= 0.93;
+
+      // Idle breathing sway
+      idleTime += delta;
+      outerMesh.rotation.y = time * 0.15;
+      outerMesh.rotation.z = Math.sin(time * 0.4) * 0.1;
+      
+      innerMesh1.rotation.x = time * 0.35;
+      innerMesh1.rotation.y = time * 0.25;
+      
+      innerMesh2.rotation.y = -time * 0.4;
+      innerMesh2.rotation.z = time * 0.2;
+
+      particles.rotation.y = time * 0.08;
+      particles.rotation.x = Math.sin(time * 0.1) * 0.05;
+
+      coreGroup.position.y = Math.sin(time * 1.2) * 0.08;
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Pause rendering when off-screen for performance
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(([entry]) => {
+      isVisible = entry.isIntersecting;
+    }, { threshold: 0.1 });
+    observer.observe(stage);
+  }
+}
+
+// Motionsites 3D Card Perspective Tilt & Dynamic Specular Glare
+function init3DCardTilt() {
+  const cards = document.querySelectorAll(".motion-vector-card");
+  cards.forEach((card) => {
+    let glare = card.querySelector(".card-3d-glare");
+    if (!glare) {
+      glare = document.createElement("div");
+      glare.className = "card-3d-glare";
+      card.appendChild(glare);
+    }
+
+    card.addEventListener("mousemove", (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      const rotateX = ((y - centerY) / centerY) * -11;
+      const rotateY = ((x - centerX) / centerX) * 11;
+
+      card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`;
+
+      const glareX = (x / rect.width) * 100;
+      const glareY = (y / rect.height) * 100;
+      glare.style.background = `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255,255,255,0.45) 0%, rgba(255,255,255,0) 70%)`;
+      glare.style.opacity = "1";
+    });
+
+    card.addEventListener("mouseleave", () => {
+      card.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)";
+      glare.style.opacity = "0";
+    });
+  });
+}
+
+// Motionsites Magnetic Buttons
+function initMagneticButtons() {
+  const magnets = document.querySelectorAll(".magnetic-btn, .swiss-btn-red");
+  magnets.forEach((btn) => {
+    btn.addEventListener("mousemove", (e) => {
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - (rect.left + rect.width / 2);
+      const y = e.clientY - (rect.top + rect.height / 2);
+      btn.style.transform = `translate3d(${x * 0.25}px, ${y * 0.25}px, 0) scale(1.04)`;
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.transform = "translate3d(0, 0, 0) scale(1)";
+    });
+  });
 }
