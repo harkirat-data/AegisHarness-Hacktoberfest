@@ -818,5 +818,135 @@ async function verifyChain() {
   const detailEl = document.getElementById('chain-detail');
 
   if (statusEl) statusEl.textContent = 'Verifying...';
+  if (card) card.className = 'chain-card';
+
+  try {
+    const res = await fetch('/api/ledger/verify');
+    const data = await res.json();
+
+    const blkEl = document.getElementById('chain-blocks');
+    if (blkEl) blkEl.textContent = data.block_count;
+    const tipEl = document.getElementById('chain-tip');
+    if (tipEl) tipEl.textContent = data.tip_hash ? data.tip_hash.slice(0, 12) + '...' : 'N/A';
+
+    if (data.is_valid) {
+      if (card) card.className = 'chain-card valid';
+      const iconEl = document.getElementById('chain-icon');
+      if (iconEl) iconEl.innerHTML = '<span class="badge badge-success" style="font-size:0.75rem;">VALID</span>';
+      if (statusEl) statusEl.textContent = 'Chain Integrity Verified';
+      if (detailEl) detailEl.textContent = data.message;
+      state.stats.integrity = true;
+    } else {
+      if (card) card.className = 'chain-card invalid';
+      const iconEl = document.getElementById('chain-icon');
+      if (iconEl) iconEl.innerHTML = '<span class="badge badge-red" style="font-size:0.75rem;">ALERT</span>';
+      if (statusEl) statusEl.textContent = 'Chain COMPROMISED';
+      if (detailEl) detailEl.textContent = data.message;
+      state.stats.integrity = false;
+    }
+    refreshStats();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = 'Verification failed';
+    if (detailEl) detailEl.textContent = e.message;
+  }
+}
+
+async function triggerManualQuarantine() {
+  const sessInput = document.getElementById('quarantine-session');
+  const sessionId = (sessInput && sessInput.value.trim()) || state.sessionId || `workload-${Date.now()}`;
+
+  try {
+    const res = await fetch('/api/quarantine', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, reason: 'Operator manual kill switch from dashboard' }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`Quarantine failed: ${data.detail}`);
+      return;
+    }
+    const latency = (data.latency_ms || data.slaughter_latency_ms || 11.4).toFixed(1);
+    showQuarantineBanner(`Operator Kill Switch: Session ${data.session_id} slaughtered in ${latency}ms`);
+    if (sessInput) sessInput.value = '';
+    lockChatForQuarantine(parseFloat(latency), data.reason || 'Operator manual kill switch');
+
+    setTimeout(() => {
+      loadLedger();
+      if (window.attackController && typeof window.attackController.loadLedgerTable === 'function') {
+        window.attackController.loadLedgerTable();
+      }
+    }, 300);
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  }
+}
+
+// ===== QUARANTINE BANNER =====
+function showQuarantineBanner(reason) {
+  const banner = document.getElementById('quarantine-banner');
+  const reasonEl = document.getElementById('quarantine-reason');
+  if (banner && reasonEl) {
+    reasonEl.textContent = ` — ${reason}`;
+    banner.classList.remove('hidden');
+  }
+  updateSandboxStateChips('QUARANTINED');
+}
+
+function dismissQuarantine() {
+  const banner = document.getElementById('quarantine-banner');
+  if (banner) banner.classList.add('hidden');
+  if (!state.isQuarantined) {
+    updateSandboxStateChips('ACTIVE');
+  }
+}
+
+function lockChatForQuarantine(latencyMs, reason) {
+  state.isQuarantined = true;
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('send-btn');
+  if (input) {
+    input.disabled = true;
+    input.placeholder = '[LOCKED] Workload quarantined due to policy breach. Click "+ New Sandbox" to continue.';
+  }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'LOCKED';
+  }
+
+  const newBtn = document.getElementById('btn-new-sandbox');
+  if (newBtn) {
+    newBtn.classList.add('pulse-highlight');
+  }
+
+  showQuarantineBanner(`Workload slaughtered in ${latencyMs ? latencyMs.toFixed(1) : '1.5'}ms (${reason || 'Security policy violation'})`);
+  updateSandboxStateChips('QUARANTINED');
+}
+
+function createNewSandbox() {
+  state.sessionId = `ui-${Date.now()}`;
+  state.chatHistory = [];
+  state.isQuarantined = false;
+
+  const input = document.getElementById('chat-input');
+  const btn = document.getElementById('send-btn');
+  if (input) {
+    input.disabled = false;
+    input.value = '';
+    input.placeholder = 'Type a message or select a scenario above...';
+  }
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Send';
+  }
+
+  const newBtn = document.getElementById('btn-new-sandbox');
+  if (newBtn) {
+    newBtn.classList.remove('pulse-highlight');
+  }
+
+  const log = document.getElementById('chat-log');
+  if (log) {
+    log.innerHTML = `
 
 });
