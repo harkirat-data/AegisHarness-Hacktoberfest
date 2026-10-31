@@ -1548,3 +1548,457 @@ body {
 }
 
 /* Swiss Signature Numbers Grid (01, 02, 03, 04) */
+.swiss-numbers-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  margin-bottom: 3.5rem;
+  padding-top: 1.75rem;
+  border-top: 3px solid #1A1A1A;
+}
+
+.swiss-num-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.swiss-num-big {
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: #1A1A1A;
+  margin-bottom: 0.65rem;
+}
+
+.swiss-num-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #1A1A1A;
+  margin-bottom: 0.6rem;
+  line-height: 1.35;
+}
+
+.swiss-num-desc {
+  font-size: 0.82rem;
+  color: #6E6B66;
+  line-height: 1.6;
+}
+
+/* Editorial 3-Column Story */
+.editorial-story-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2.75rem;
+  margin-bottom: 3rem;
+  padding-bottom: 3rem;
+  border-bottom: 1px solid #E2DDD5;
+}
+
+.editorial-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.editorial-col-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #B23A22;
+  margin-bottom: 0.45rem;
+}
+
+.editorial-col-h3 {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  line-height: 1.32;
+  margin-bottom: 0.85rem;
+}
+
+.editorial-col-p {
+  font-size: 0.85rem;
+  color: #4A4A4A;
+  line-height: 1.7;
+}
+
+/* Swiss Action Row */
+.swiss-cta-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #FAF8F5;
+  border: 2px solid #1A1A1A;
+  color: #1A1A1A;
+  padding: 1.75rem 2.5rem;
+  border-radius: 6px;
+  gap: 2rem;
+}
+
+.swiss-cta-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #1A1A1A;
+}
+
+.swiss-btn-red {
+  background: #B23A22;
+  color: #FFFFFF;
+  border: 1px solid #8B1E0F;
+  padding: 0.85rem 2rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.swiss-btn-red:hover {
+  background: #8B1E0F;
+  transform: translateY(-1px);
+}
+
+/* ========================================================================= */
+/* EDITORIAL THEME OVERRIDES FOR DASHBOARD BUTTONS, GRAPHS & BLUE ZONE       */
+/* ========================================================================= */
+
+.btn-primary {
+  background: #B23A22 !important;
+  color: #FFFFFF !important;
+  border: 1px solid #8B1E0F !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(178, 58, 34, 0.15) !important;
+}
+
+.btn-primary:hover {
+  background: #8B1E0F !important;
+  border-color: #701407 !important;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  background: #FAF8F5 !important;
+  color: #1A1A1A !important;
+  border: 1px solid #D8D2C6 !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 2px rgba(26, 26, 26, 0.04) !important;
+}
+
+.btn-secondary:hover {
+  background: #E9DFCE !important;
+  border-color: #B8B0A2 !important;
+  color: #1A1A1A !important;
+}
+
+.btn-danger {
+  background: #FBEBE8 !important;
+  color: #B23A22 !important;
+  border: 1px solid #F5C6BE !important;
+  font-weight: 700 !important;
+}
+
+.btn-danger:hover {
+  background: #B23A22 !important;
+  color: #FFFFFF !important;
+  border-color: #8B1E0F !important;
+}
+
+.btn-warning {
+  background: #FDF6E2 !important;
+  color: #92400e !important;
+  border: 1px solid #F7E0A3 !important;
+  font-weight: 600 !important;
+}
+
+.btn-warning:hover {
+  background: #F5E6B8 !important;
+}
+
+/* Zero-Trust Architecture Diagram (Editorial Ink & Paper) */
+.arch-visualizer-card {
+  background: #FAF8F5 !important;
+  border: 1px solid #E2DDD5 !important;
+}
+
+.arch-node {
+  background: #FAF8F5 !important;
+  border: 1px solid #D8D2C6 !important;
+  color: #1A1A1A !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  border-radius: 4px !important;
+  padding: 0.65rem 0.5rem !important;
+  text-align: center;
+  transition: all 0.25s ease;
+}
+
+.arch-node-num {
+  font-size: 0.65rem !important;
+  font-weight: 800 !important;
+  color: #B23A22 !important;
+}
+
+.arch-node-title {
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+  color: #1A1A1A !important;
+}
+
+.arch-node-sub {
+  font-size: 0.68rem !important;
+  color: #6E6B66 !important;
+}
+
+.arch-edge {
+  stroke: #D8D2C6 !important;
+  stroke-width: 2 !important;
+  stroke-dasharray: 4, 3;
+}
+
+.arch-node.state-blue {
+  border-color: #B23A22 !important;
+  background: #FDF4F2 !important;
+}
+
+.arch-node.state-green {
+  border-color: #1E653A !important;
+  background: #EBF5EE !important;
+}
+
+.arch-node.state-red {
+  border-color: #B23A22 !important;
+  background: #FBEBE8 !important;
+}
+
+.arch-node.state-purple {
+  border-color: #8B1E0F !important;
+  background: #F9EBEA !important;
+}
+
+/* Oscilloscope & Latency Waveform Panel */
+.net-spike-panel {
+  background: #FAF8F5 !important;
+  border: 1px solid #E2DDD5 !important;
+  color: #1A1A1A !important;
+}
+
+.net-spike-canvas-wrap {
+  position: relative;
+  background: #FAF8F5;
+  border: 1px solid #E2DDD5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.net-log-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.35rem 0.65rem;
+  background: #FAF8F5;
+  border: 1px solid #EAE6DF;
+  border-radius: 3px;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem;
+  color: #1A1A1A;
+}
+
+/* Blue Zone Live Feed & Motion Graph (Warm Paper Styling) */
+#blue-events-stream {
+  background: #FAF8F5 !important;
+  border: 1px solid #E2DDD5 !important;
+  color: #1A1A1A !important;
+}
+
+.motion-graph-wrap {
+  background: #FAF8F5 !important;
+  border: 1px solid #E2DDD5 !important;
+}
+
+/* ========================================================================= */
+/* LANDING PAGE MOTION SYSTEM (Mobbin & MotionSites Specification)           */
+/* ========================================================================= */
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+@keyframes pulseSubtle {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+}
+
+.motion-float {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.motion-float-reverse {
+  animation: floatReverse 7s ease-in-out infinite;
+}
+
+.motion-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  filter: blur(4px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform, filter;
+}
+
+.motion-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+
+/* Interactive Motion Chapter Layout */
+.motion-chapter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3.5rem;
+  align-items: center;
+  margin: 4.5rem 0;
+  padding: 2.5rem 0;
+  border-top: 1px solid #E2DDD5;
+}
+
+.motion-chapter.reverse {
+  direction: rtl;
+}
+
+.motion-chapter.reverse > * {
+  direction: ltr;
+}
+
+.motion-vector-card {
+  position: relative;
+  background: #FAF8F5;
+  border: 1px solid #E2DDD5;
+  border-radius: 12px;
+  padding: 2.5rem;
+  box-shadow: 0 12px 36px rgba(26, 26, 26, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+.motion-vector-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 48px rgba(26, 26, 26, 0.08);
+}
+
+.motion-vector-img {
+  width: 100%;
+  max-width: 380px;
+  height: auto;
+  object-fit: contain;
+  transition: transform 0.5s ease;
+}
+
+.motion-vector-card:hover .motion-vector-img {
+  transform: scale(1.03);
+}
+
+.motion-badge-chip {
+  position: absolute;
+  background: #FAF8F5;
+  border: 1px solid #D8D2C6;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #1A1A1A;
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.motion-badge-chip.top-right {
+  top: 18px;
+  right: 18px;
+}
+
+.motion-badge-chip.bottom-left {
+  bottom: 18px;
+  left: 18px;
+}
+
+/* Interactive Simulation Terminal Card on Landing Page */
+.motion-interactive-terminal {
+  background: #FAF8F5;
+  border: 1px solid #E2DDD5;
+  border-radius: 10px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+  font-family: 'Fira Code', monospace;
+  font-size: 0.78rem;
+  margin: 3rem 0;
+}
+
+.motion-terminal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #E2DDD5;
+  margin-bottom: 1rem;
+}
+
+.motion-terminal-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.motion-terminal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  background: #F4EFE6;
+  transition: all 0.25s ease;
+}
+
+.motion-terminal-row:hover {
+  background: #EAE3D5;
+}
+
+
+
+
