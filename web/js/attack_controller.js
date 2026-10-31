@@ -2748,5 +2748,305 @@ class AttackController {
             ],
           };
 
+          this.updateTechnicalPanel(recordData);
+          this.recordTestRun(
+            recordData,
+            `Technique #${evalData.number}: ${evalData.name}`,
+            tech.category,
+            evalData.execution_id
+          );
+        }
+      }
+      alert(`Completed 20-Technique Red Team Evaluation against ${targetModel}. Check the metrics and execution log.`);
+    } catch (err) {
+      alert(`Technique evaluation error: ${err.message}`);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = originalText;
+      }
+    }
+  }
+
+  openScorecardModal(title, scorecard) {
+    const modal = document.getElementById("scorecard-modal");
+    const titleEl = document.getElementById("sc-modal-title");
+    const attemptedEl = document.getElementById("sc-attempted");
+    const passedEl = document.getElementById("sc-passed");
+    const failedEl = document.getElementById("sc-failed");
+    const rateEl = document.getElementById("sc-rate");
+    const expEl = document.getElementById("sc-explanation");
+    const tbody = document.getElementById("sc-tbody");
+
+    if (!modal || !tbody) return;
+
+    if (titleEl) titleEl.innerText = title;
+    const totalCount = scorecard.total_tests || scorecard.attempted || 9;
+    if (attemptedEl) attemptedEl.innerText = totalCount;
+    const passCount = scorecard.threats_trapped != null ? scorecard.threats_trapped : (scorecard.passed || 0);
+    if (passedEl) passedEl.innerText = passCount;
+    const failCount = scorecard.failed != null ? scorecard.failed : 0;
+    if (failedEl) failedEl.innerText = failCount;
+    const rateVal = scorecard.interception_success_rate_percent != null ? scorecard.interception_success_rate_percent : (scorecard.pass_rate_percent || 0);
+    if (rateEl) rateEl.innerText = `${rateVal}%`;
+    if (expEl) expEl.innerText = scorecard.denominator_explanation || "Adversarial Attack Library: 9 payloads evaluated (7 Adversarial Exploits + 2 Benign Controls).";
+
+    tbody.innerHTML = "";
+    const inPageRows = [];
+
+    (scorecard.test_summary || []).forEach((t) => {
+      const tr = document.createElement("tr");
+      const verdict = t.verdict || (t.trapped ? "PASS" : "FAIL");
+      const badgeClass = verdict === "PASS" ? "badge badge-permitted" : "badge badge-blocked";
+      const latencyStr = typeof t.latency_ms === "number" && t.latency_ms > 0 ? `${t.latency_ms.toFixed(1)} ms` : "--";
+      const scopeStr = t.resource_scope || (t.is_adversarial ? "Restricted Boundary" : "Permitted Boundary");
+
+      const isDirectPep = (t.evaluation_mode === "DIRECT_PEP" || scorecard.evaluation_mode === "DIRECT_PEP");
+      const execTypeBadge = isDirectPep
+        ? `<span class="badge badge-blue" title="Direct PEP enforcement (Bypasses LLM)">DIRECT_PEP (SIMULATED)</span>`
+        : `<span class="badge badge-permitted" title="Live Model Inference & Red Team Prompt">MODEL_DRIVEN</span>`;
+
+      const isModelDirect = (t.observed_outcome === "MODEL_DIRECT_RESPONSE" || t.observed_outcome === "MODEL_REFUSED" || t.observed_outcome === "DIRECT_RESPONSE");
+      const pepDecisionDisplay = (t.pep_decision && t.pep_decision !== "NOT_EXECUTED" && t.pep_decision !== "NOT EXECUTED")
+        ? t.pep_decision
+        : (isModelDirect ? "NOT EXECUTED" : (t.trapped ? "DENIED" : (t.policy_approved ? "AUTHORIZED" : "NOT EXECUTED")));
+      const pepBadgeClass = pepDecisionDisplay === "DENIED" ? "badge-blocked" : (pepDecisionDisplay === "AUTHORIZED" ? "badge-permitted" : "badge-neutral");
+
+      tr.innerHTML = `
+        <td><strong>${t.name || t.id}</strong></td>
+        <td><span class="badge badge-neutral">${t.category || (t.is_adversarial ? "Adversarial" : "Control")}</span></td>
+        <td><span class="font-mono" style="font-size:0.72rem;">${scopeStr}</span></td>
+        <td>${execTypeBadge}</td>
+        <td><strong>${t.observed_outcome || (t.trapped ? "TRAPPED" : "PERMITTED")}</strong></td>
+        <td><span class="badge ${pepBadgeClass}">${pepDecisionDisplay}</span></td>
+        <td><span class="${badgeClass}">${verdict}</span></td>
+        <td class="font-mono">${latencyStr}</td>
+      `;
+      tbody.appendChild(tr);
+
+      // In-page table row matching: Run/Exec ID, Objective, Scope, Observed Outcome, PEP Decision, Verdict, Latency
+      inPageRows.push(`
+        <tr>
+          <td class="font-mono text-blue" title="${t.test_run_id || t.id}">${(t.test_run_id || t.id || '').substring(0, 16)}...</td>
+          <td>${t.name || t.id}</td>
+          <td><span class="badge badge-neutral">${scopeStr}</span></td>
+          <td><strong>${t.observed_outcome || (t.trapped ? "TRAPPED" : "PERMITTED")}</strong></td>
+          <td><span class="badge ${pepBadgeClass}">${pepDecisionDisplay}</span></td>
+          <td><span class="${badgeClass}">${verdict}</span></td>
+          <td class="font-mono">${latencyStr}</td>
+        </tr>
+      `);
+    });
+
+    // Populate in-page Security Tests table
+    const pageTbody = document.getElementById("security-tests-tbody");
+    if (pageTbody && inPageRows.length > 0) {
+      pageTbody.innerHTML = inPageRows.join("");
+    }
+
+    // Update active test run ID
+    const runIdDisplay = document.getElementById("active-test-run-id");
+    if (runIdDisplay) runIdDisplay.innerText = scorecard.test_run_id || "attack-suite-9";
+
+    // Update metrics
+    this.testMetrics.attempted = totalCount;
+    this.testMetrics.pepDenials = passCount;
+    this.testMetrics.confirmedBreaches = failCount;
+    const tAttempted = document.getElementById("test-count-attempted");
+    if (tAttempted) tAttempted.innerText = totalCount;
+    const tDen = document.getElementById("test-count-pep-denials");
+    if (tDen) tDen.innerText = passCount;
+    const tBre = document.getElementById("test-count-breaches");
+    if (tBre) tBre.innerText = failCount;
+    const tRate = document.getElementById("test-pep-defense-rate");
+    if (tRate) tRate.innerText = `${rateVal}%`;
+    const tNote = document.getElementById("test-pep-defense-note");
+    if (tNote) tNote.innerText = `${passCount} / ${passCount + failCount} checks defended`;
+
+    modal.classList.remove("hidden");
+  }
+
+  openScenariosScorecardModal(title, data) {
+    const modal = document.getElementById("scorecard-modal");
+    const titleEl = document.getElementById("sc-modal-title");
+    const attemptedEl = document.getElementById("sc-attempted");
+    const passedEl = document.getElementById("sc-passed");
+    const failedEl = document.getElementById("sc-failed");
+    const rateEl = document.getElementById("sc-rate");
+    const expEl = document.getElementById("sc-explanation");
+    const tbody = document.getElementById("sc-tbody");
+
+    if (!modal || !tbody) return;
+
+    if (titleEl) titleEl.innerText = title;
+    const totalCount = data.total_scenarios || 8;
+    if (attemptedEl) attemptedEl.innerText = totalCount;
+    const passCount = data.passed != null ? data.passed : 0;
+    if (passedEl) passedEl.innerText = passCount;
+    const failCount = data.failed != null ? data.failed : 0;
+    if (failedEl) failedEl.innerText = failCount;
+    if (rateEl) rateEl.innerText = `${data.pass_rate_percent || 0}%`;
+    if (expEl) expEl.innerText = data.denominator_explanation || "Mandatory Section 8 verification battery: 8 scenarios (7 Live Execution + 1 Application Seccomp Simulation fixture).";
+
+    tbody.innerHTML = "";
+    const inPageRows = [];
+
+    (data.scenarios || []).forEach((s) => {
+      const tr = document.createElement("tr");
+      const verdict = s.final_assessment || "PASS";
+      const badgeClass = verdict === "PASS" ? "badge badge-permitted" : "badge badge-blocked";
+      const isSim = s.execution_type === "SIMULATION";
+      const execTypeBadge = isSim ? `<span class="badge badge-neutral" title="Application-level simulation fixture">SIMULATION</span>` : `<span class="badge badge-permitted">LIVE_EXECUTION</span>`;
+      const latencyStr = typeof s.execution_time_ms === "number" ? `${s.execution_time_ms.toFixed(1)} ms` : "--";
+      const scopeStr = s.resource_scope || "Target Boundary";
+
+      tr.innerHTML = `
+        <td><strong>${s.scenario_name}</strong></td>
+        <td><span class="badge badge-neutral">${s.attack_category}</span></td>
+        <td><span class="font-mono" style="font-size:0.72rem;">${scopeStr}</span></td>
+        <td>${execTypeBadge}</td>
+        <td><strong>${s.observed_outcome || s.runtime_enforcement_result}</strong></td>
+        <td><span class="badge ${s.pep_decision === 'DENIED' || s.pep_decision === 'RUNTIME_BLOCKED' ? 'badge-blocked' : 'badge-permitted'}">${s.pep_decision || 'DENIED'}</span></td>
+        <td><span class="${badgeClass}">${verdict}</span></td>
+        <td class="font-mono">${latencyStr}</td>
+      `;
+      tbody.appendChild(tr);
+
+      // In-page table row matching: Run/Exec ID, Objective, Scope, Observed Outcome, PEP Decision, Verdict, Latency
+      inPageRows.push(`
+        <tr>
+          <td class="font-mono text-blue" title="${s.scenario_id || s.audit_event_id}">${(s.scenario_id || s.audit_event_id || '').substring(0, 16)}...</td>
+          <td>${s.scenario_name}</td>
+          <td><span class="badge badge-neutral">${scopeStr}</span></td>
+          <td><strong>${s.observed_outcome || s.runtime_enforcement_result}</strong></td>
+          <td><span class="badge ${s.pep_decision === 'DENIED' || s.pep_decision === 'RUNTIME_BLOCKED' ? 'badge-blocked' : 'badge-permitted'}">${s.pep_decision || 'DENIED'}</span></td>
+          <td><span class="${badgeClass}">${verdict}</span></td>
+          <td class="font-mono">${latencyStr}</td>
+        </tr>
+      `);
+    });
+
+    // Populate in-page Security Tests table
+    const pageTbody = document.getElementById("security-tests-tbody");
+    if (pageTbody && inPageRows.length > 0) {
+      pageTbody.innerHTML = inPageRows.join("");
+    }
+
+    // Update active test run ID
+    const runIdDisplay = document.getElementById("active-test-run-id");
+    if (runIdDisplay) runIdDisplay.innerText = data.suite_run_id || "scenarios-battery-8";
+
+    // Update metrics
+    this.testMetrics.attempted = totalCount;
+    this.testMetrics.pepDenials = passCount;
+    this.testMetrics.confirmedBreaches = failCount;
+    const tAttempted = document.getElementById("test-count-attempted");
+    if (tAttempted) tAttempted.innerText = totalCount;
+    const tDen = document.getElementById("test-count-pep-denials");
+    if (tDen) tDen.innerText = passCount;
+    const tBre = document.getElementById("test-count-breaches");
+    if (tBre) tBre.innerText = failCount;
+    const tRate = document.getElementById("test-pep-defense-rate");
+    if (tRate) tRate.innerText = `${data.pass_rate_percent}%`;
+    const tNote = document.getElementById("test-pep-defense-note");
+    if (tNote) tNote.innerText = `${passCount} / ${passCount + failCount} checks defended`;
+
+    modal.classList.remove("hidden");
+  }
+
+
+  async loadLedgerTable() {
+    const tbody = document.getElementById("ledger-records-tbody");
+    if (!tbody) return;
+    try {
+      const res = await fetch("/api/ledger?limit=100");
+      if (res.ok) {
+        const records = await res.json();
+        const overviewBlocks = document.getElementById("overview-ledger-blocks");
+        if (overviewBlocks) {
+          overviewBlocks.innerText = `${records.length} Blocks`;
+        }
+        const blockCountSpan = document.getElementById("block-count");
+        if (blockCountSpan) {
+          blockCountSpan.innerText = records.length;
+        }
+        tbody.innerHTML = "";
+        if (records.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-muted" style="text-align:center;">No audit records found.</td></tr>';
+          return;
+        }
+        records.forEach((r) => {
+          const tr = document.createElement("tr");
+          const sevClass = r.severity.includes("CRITICAL") ? "text-red" : (r.severity.includes("HIGH") ? "text-amber" : "text-emerald");
+          tr.innerHTML = `
+            <td><strong>#${r.index}</strong></td>
+            <td><span class="badge badge-neutral">${r.source_zone}</span></td>
+            <td><strong>${r.event_type}</strong></td>
+            <td><span class="${sevClass}">${r.severity}</span></td>
+            <td class="font-mono text-muted" style="font-size:0.75rem;">${r.previous_hash.substring(0, 12)}...</td>
+            <td class="font-mono text-blue" style="font-size:0.75rem;">${r.current_hash.substring(0, 12)}...${r.current_hash.substring(56)}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+    } catch (e) {
+      console.warn("Failed to load ledger records:", e);
+    }
+  }
+
+  openHistoryModal() {
+    const modal = document.getElementById("history-modal");
+    const tbody = document.getElementById("history-tbody");
+    if (!modal || !tbody) return;
+
+    tbody.innerHTML = "";
+    if (this.runHistory.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-muted">No runs executed yet.</td></tr>';
+    } else {
+      this.runHistory.forEach((r) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td class="text-cyan">${r.run_id}</td>
+          <td>${r.model}</td>
+          <td class="text-muted" title="${r.prompt}">${r.prompt}</td>
+          <td>${r.workload_pid}</td>
+          <td><span class="${r.outcome.includes('DENIED') || r.outcome.includes('BLOCKED') ? 'text-red' : 'text-emerald'}">${r.outcome}</span></td>
+          <td>${r.trapped}</td>
+          <td>${r.latency}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+    modal.classList.remove("hidden");
+  }
+
+  async triggerManualKill() {
+    const sbxDisplay = document.getElementById("sandbox-id-display");
+    const sandboxId = sbxDisplay ? sbxDisplay.innerText : "";
+    const sessionId = this.lastSessionId || (sandboxId ? sandboxId.replace("target-sbx-", "") : "");
+
+    if (!sessionId || sessionId === "idle" || sessionId === "unknown") {
+      alert("No active disposable workload found to quarantine. Launch a test first.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/quarantine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          reason: "Operator manual kill switch pressed from Blue Console",
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        // 1. Validate response object safely
+        if (!data || typeof data !== "object") {
+          alert("Quarantine response invalid.");
+          return;
+        }
 
 }
