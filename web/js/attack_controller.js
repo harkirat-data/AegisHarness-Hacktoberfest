@@ -3898,5 +3898,42 @@ class AttackController {
       const pepEl = document.getElementById("inc-modal-pep");
       const modelEl = document.getElementById("inc-modal-model");
       const contEl = document.getElementById("inc-modal-containment");
+      const promptEl = document.getElementById("inc-modal-prompt");
+      const rawEl = document.getElementById("inc-modal-raw-response");
+      const toolEl = document.getElementById("inc-modal-tool-proposal");
+      const expEl = document.getElementById("inc-modal-explanation");
+      const resEl = document.getElementById("inc-modal-resource-result");
+      const hashEl = document.getElementById("inc-modal-audit-hash");
 
+      if (idEl) idEl.innerText = inc.incident_id;
+      if (sevEl) {
+        sevEl.innerText = inc.severity;
+        const isCrit = inc.severity && (inc.severity.includes('CRITICAL') || inc.severity.includes('HIGH'));
+        sevEl.className = `metric-tile-val ${isCrit ? 'text-red' : 'text-blue'}`;
+      }
+      if (pepEl) pepEl.innerText = inc.pep_decision;
+      if (modelEl) modelEl.innerText = inc.target_model;
+      if (contEl) contEl.innerText = inc.containment_status;
+      if (promptEl) promptEl.innerText = inc.prompt || inc.attack_prompt || "N/A";
+      if (rawEl) rawEl.innerText = inc.raw_response || inc.raw_model_response || "N/A";
+      if (toolEl) toolEl.innerText = inc.tool_arguments ? `${inc.proposed_tool || 'tool'}(${inc.tool_arguments})` : (inc.proposed_tool || inc.tool_proposal ? JSON.stringify(inc.proposed_tool || inc.tool_proposal, null, 2) : "NONE");
+      if (expEl) expEl.innerText = inc.pep_reason || inc.policy_explanation || "Zero-Trust PEP boundary policy enforcement.";
+      if (resEl) resEl.innerText = inc.resource_access_outcome || inc.resource_access_result || "ACCESS_DENIED";
+      if (hashEl) hashEl.innerText = inc.audit_hash || "NONE";
+    } catch (e) {
+      console.error("Failed to open incident detail", e);
+    }
+  }
+}
+
+function initAttackController() {
+  if (!window.attackController) {
+    window.attackController = new AttackController();
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initAttackController);
+} else {
+  initAttackController();
 }
