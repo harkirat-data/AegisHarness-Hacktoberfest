@@ -460,7 +460,7 @@
     const bracketGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
     const bracketMat = new THREE.MeshBasicMaterial({ color: PALETTE.borderDark });
     [[-1.35, -1.8, -1.35], [1.35, -1.8, -1.35], [-1.35, 1.8, -1.35], [1.35, 1.8, -1.35],
-     [-1.35, -1.8, 1.35], [1.35, -1.8, 1.35], [-1.35, 1.8, 1.35], [1.35, 1.8, 1.35]].forEach((pos) => {
+    [-1.35, -1.8, 1.35], [1.35, -1.8, 1.35], [-1.35, 1.8, 1.35], [1.35, 1.8, 1.35]].forEach((pos) => {
       const b = new THREE.Mesh(bracketGeo, bracketMat);
       b.position.set(...pos);
       vaultGroup.add(b);
@@ -1093,14 +1093,14 @@
       return;
     }
 
-    // Initialize all 5 artifacts
-    initHeroPolicyBoundary();
+    // Initialize chapter artifacts (Hero 3D stage removed per design specification)
+    // initHeroPolicyBoundary();
     initAssetVaultArtifact();
     initAdversarialFieldArtifact();
     initPolicyGateArtifact();
     initImmutableLedgerArtifact();
 
-    console.log('[Aegis 3D] All 5 interactive 3D technical artifacts successfully mounted.');
+    console.log('[Aegis 3D] All chapter 3D technical artifacts successfully mounted.');
   }
 
   // Auto-init on DOM ready
@@ -1113,3 +1113,4 @@
   // Expose globally if manual re-init needed
   window.initAllAegis3DArtifacts = initAllAegis3DArtifacts;
 })();
+
