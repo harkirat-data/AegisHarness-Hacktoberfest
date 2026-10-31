@@ -148,13 +148,13 @@
               <li>Zero direct OS filesystem or network access without explicit PEP sign-off</li>
             </ul>
           </div>
-          <div class="motion-vector-card motion-float">
-            <img src="/static/images/vector_zero_trust_login.png" alt="Company Zone Zero-Trust Authentication" class="motion-vector-img" />
+          <div class="motion-vector-card motion-float" id="stage-vault">
+            <canvas id="canvas-vault" class="artifact-3d-canvas" aria-label="3D Enterprise Asset Vault Artifact"></canvas>
             <div class="motion-badge-chip top-right">
               <span class="red-dot"></span> FCA REGULATED
             </div>
             <div class="motion-badge-chip bottom-left">
-              <span>VAULT</span> Enterprise Vault
+              <span>VAULT</span> Protected Vault
             </div>
           </div>
         </section>
@@ -175,13 +175,13 @@
               <li>Interactive manual red-team chat workbench with technical parameter capture</li>
             </ul>
           </div>
-          <div class="motion-vector-card motion-float-reverse">
-            <img src="/static/images/vector_hacker_attack.png" alt="Adversarial Red Team Ingress" class="motion-vector-img" />
+          <div class="motion-vector-card motion-float-reverse" id="stage-adversarial">
+            <canvas id="canvas-adversarial" class="artifact-3d-canvas" aria-label="3D Adversarial Signal Field Artifact"></canvas>
             <div class="motion-badge-chip top-right" style="color: #B23A22; border-color: #F5C6BE;">
               <span class="red-dot"></span> 20 TECHNIQUES
             </div>
             <div class="motion-badge-chip bottom-left">
-              <span>INGRESS</span> Attack Gateway
+              <span>INGRESS</span> Signal Field
             </div>
           </div>
         </section>
@@ -202,8 +202,8 @@
               <li>Real-time oscilloscope latency waveform &amp; HTTP request tracing</li>
             </ul>
           </div>
-          <div class="motion-vector-card motion-float">
-            <img src="/static/images/vector_policy_check.png" alt="Policy Enforcement Sentry" class="motion-vector-img" />
+          <div class="motion-vector-card motion-float" id="stage-policy">
+            <canvas id="canvas-policy" class="artifact-3d-canvas" aria-label="3D Deterministic Policy Gate Artifact"></canvas>
             <div class="motion-badge-chip top-right">
               <span>PEP</span> DETERMINISTIC PEP
             </div>
@@ -229,8 +229,8 @@
               <li>Full forensic telemetry correlation with Blue SOC incident timelines</li>
             </ul>
           </div>
-          <div class="motion-vector-card motion-float-reverse">
-            <img src="/static/images/vector_sysadmin.png" alt="Cryptographic Ledger & Audit Logs" class="motion-vector-img" />
+          <div class="motion-vector-card motion-float-reverse" id="stage-ledger">
+            <canvas id="canvas-ledger" class="artifact-3d-canvas" aria-label="3D Immutable Ledger Structure Artifact"></canvas>
             <div class="motion-badge-chip top-right">
               <span>WORM</span> MERKLE WORM
             </div>
@@ -1398,5 +1398,6 @@ Select a jailbreak payload from the left to inspect its adversarial instructions
   <script src="/static/js/dashboard.js"></script>
   <script src="/static/js/attack_controller.js"></script>
   <script src="/static/js/aegis_app.js"></script>
+  <script src="/static/js/aegis_3d_artifacts.js"></script>
 </body>
 </html>
